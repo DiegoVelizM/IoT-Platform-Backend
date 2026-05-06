@@ -1,17 +1,19 @@
 # IoT Platform Backend
 
-Backend de plataforma IoT desarrollado con NestJS, MongoDB y Docker.
+Backend de plataforma IoT desarrollado con NestJS, MongoDB, Mongoose y Docker.
 
 ## Características
 
 - API REST con NestJS
-- Swagger/OpenAPI
-- Persistencia MongoDB
+- Documentación Swagger/OpenAPI
+- Persistencia de telemetría con MongoDB
+- Modelado y validación mediante Mongoose
 - Docker y Docker Compose
-- Endpoint de telemetría
-- Sistema de alertas
+- Ingestión de telemetría
 - Validaciones DTO
 - Simulación de sensores
+- Definición y prueba de contratos de eventos
+- Arquitectura orientada a eventos (preparación para Kafka)
 
 ---
 
@@ -22,7 +24,7 @@ Backend de plataforma IoT desarrollado con NestJS, MongoDB y Docker.
 - MongoDB
 - Mongoose
 - Docker
-- Swagger
+- Swagger / OpenAPI
 
 ---
 
@@ -80,26 +82,75 @@ http://localhost:3000/docs
 POST /telemetry
 ```
 
-### Health Check
+Recibe y almacena telemetría de sensores simulados.
 
-```http
-GET /health
-```
+---
 
 ### Sensores
 
 ```http
 GET /sensors
 GET /sensors/latest
-GET /sensors/alerts
 GET /sensors/sensor/:sensorId
 ```
+
+Permiten consultar lecturas almacenadas en MongoDB.
+
+---
+
+### Eventos (testing temporal)
+
+```http
+POST /events/test
+```
+
+Endpoint temporal utilizado para validar contratos y recepción de eventos antes de la integración con Kafka.
+
+---
+
+### Health Check
+
+```http
+GET /health
+```
+
+Verifica disponibilidad del backend.
+
+---
+
+## Persistencia
+
+La telemetría se almacena en MongoDB mediante Mongoose.
+
+Los documentos incluyen:
+- sensorId
+- ubicación
+- temperatura
+- humedad
+- nivel de gas
+- batería
+- coordenadas GPS
+- timestamp automático
+
+---
+
+## Arquitectura
+
+El sistema sigue una arquitectura modular y orientada a eventos.
+
+Flujo principal:
+
+```txt
+Sensores simulados → API → Procesamiento → MongoDB → Eventos
+```
+
+La integración con Kafka será implementada en sprints posteriores.
 
 ---
 
 ## Estado del proyecto
 
-Proyecto académico orientado a simulación y procesamiento de telemetría IoT.
+Proyecto académico orientado a simulación, procesamiento y distribución de telemetría IoT en tiempo real.
 
 Actualmente en desarrollo.
 ## Stay in touch

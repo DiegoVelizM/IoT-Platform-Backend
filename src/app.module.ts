@@ -7,6 +7,7 @@ import { SensorsModule } from './sensors/sensors.module';
 import { TelemetryModule } from './telemetry/telemetry.module';
 import { HealthModule } from './health/health.module';
 import { EventsModule } from './events/events.module';
+import { AlertsModule } from './alerts/alerts.module';
 
 
 @Module({
@@ -19,6 +20,7 @@ import { EventsModule } from './events/events.module';
     TelemetryModule,
     HealthModule,
     EventsModule,
+    AlertsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

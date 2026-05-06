@@ -25,10 +25,4 @@ export class SensorsController {
     findBySensor(@Param('sensorId') sensorId: string) {
         return this.sensorsService.findBySensor(sensorId);
     }
-
-    @Get('alerts')
-    @ApiOperation({ summary: 'Obtener lecturas con alerta' })
-    findAlerts() {
-        return this.sensorsService.findAlerts();
-    }
 }

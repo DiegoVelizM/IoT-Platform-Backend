@@ -23,17 +23,14 @@ export class SensorReading {
     @Prop({ required: true })
     batteryLevel!: number;
 
-    @Prop({ default: false })
-    alert!: boolean;
-
     @Prop({ required: true })
     latitude!: number;
 
     @Prop({ required: true })
     longitude!: number;
 
-    @Prop({ required: true })
-    timestamp!: string;
+    @Prop({ required: true, default: Date.now })
+    timestamp!: Date;
 }
 
 export const SensorReadingSchema = SchemaFactory.createForClass(SensorReading);

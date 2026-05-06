@@ -12,17 +12,12 @@ export class SensorsService {
     ) {}
 
     async create(createSensorReadingDto: CreateSensorReadingDto) {
-        const alert =
-        createSensorReadingDto.gasLevel > 50 ||
-        createSensorReadingDto.temperature > 45 ||
-        createSensorReadingDto.batteryLevel < 20;
 
-    const reading = new this.sensorReadingModel({
-        ...createSensorReadingDto,
-        alert,
-    });
+        const reading = new this.sensorReadingModel({
+            ...createSensorReadingDto,
+        });
 
-    return reading.save();
+        return reading.save();
     }
 
     async findAll() {
@@ -40,10 +35,4 @@ export class SensorsService {
             .exec();
     }
 
-    async findAlerts() {
-        return this.sensorReadingModel
-            .find({ alert: true })
-            .sort({ createdAt: -1 })
-            .exec();
-    }
 }

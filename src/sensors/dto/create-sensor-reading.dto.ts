@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsDateString, IsLatitude, IsLongitude, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsLatitude, IsLongitude, IsNumber, IsString, Max, Min } from 'class-validator';
 
 export class CreateSensorReadingDto {
     @ApiProperty({ example: 'ESP32-001' })
@@ -32,11 +32,6 @@ export class CreateSensorReadingDto {
     @Max(100)
     batteryLevel!: number;
 
-    @ApiProperty({ example: false, required: false })
-    @IsOptional()
-    @IsBoolean()
-    alert?: boolean;
-
     @ApiProperty({ example: -29.9533 })
     @IsLatitude()
     latitude!: number;
@@ -44,9 +39,5 @@ export class CreateSensorReadingDto {
     @ApiProperty({ example: -71.3436 })
     @IsLongitude()
     longitude!: number;
-
-    @ApiProperty({ example: '2026-05-05T20:45:00.000Z' })
-    @IsDateString()
-    timestamp!: string;
 
 }

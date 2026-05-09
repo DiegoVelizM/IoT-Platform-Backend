@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsIn, IsString } from 'class-validator';
+import { IsBoolean, IsIn, IsOptional, IsString } from 'class-validator';
 
 export class CreateAlertDto {
 
@@ -11,7 +11,7 @@ export class CreateAlertDto {
     @IsString()
     type!: string;
 
-    @ApiProperty({ example: 'warning' })
+    @ApiProperty({ example: 'warning', enum: ['warning', 'critical'] })
     @IsIn(['warning', 'critical'])
     severity!: 'warning' | 'critical';
 
@@ -20,6 +20,7 @@ export class CreateAlertDto {
     message!: string;
 
     @ApiProperty({ example: false })
+    @IsOptional()
     @IsBoolean()
     resolved!: boolean;
 }

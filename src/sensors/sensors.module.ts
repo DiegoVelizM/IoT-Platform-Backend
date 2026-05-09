@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { SensorsController } from './sensors.controller';
 import { SensorsService } from './sensors.service';
+import { AlertsModule } from '../alerts/alerts.module';
 import {
   SensorReading,
   SensorReadingSchema,
@@ -15,6 +16,7 @@ import {
         schema: SensorReadingSchema,
       },
     ]),
+    AlertsModule,
   ],
   controllers: [SensorsController],
   providers: [SensorsService],

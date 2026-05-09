@@ -6,23 +6,23 @@ export type AlertDocument = HydratedDocument<Alert>;
 @Schema({ timestamps: true })
 export class Alert {
 
-    @Prop({ required: true })
-    sensorId!: string;
+  @Prop({ required: true })
+  sensorId!: string;
 
-    @Prop({ required: true })
-    type!: string;
+  @Prop({ required: true })
+  type!: string;
 
-    @Prop({ required: true })
-    severity!: 'warning' | 'critical';
+  @Prop({ required: true, enum: ['warning', 'critical'] })
+  severity!: 'warning' | 'critical';
 
-    @Prop({ required: true })
-    message!: string;
+  @Prop({ required: true })
+  message!: string;
 
-    @Prop({ default: false })
-    resolved!: boolean;
+  @Prop({ default: false })
+  resolved!: boolean;
 
-    @Prop({ required: true, default: Date.now })
-    occurredAt!: Date;
+  @Prop({ required: true, default: Date.now })
+  occurredAt!: Date;
 }
 
 export const AlertSchema = SchemaFactory.createForClass(Alert);

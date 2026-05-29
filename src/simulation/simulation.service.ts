@@ -2,15 +2,16 @@ import { Injectable, Logger } from '@nestjs/common';
 import { SensorsService } from '../sensors/sensors.service';
 import { CreateSensorReadingDto } from 'src/sensors/dto/create-sensor-reading.dto';
 import { SimulatedSensor, SensorType } from './interfaces/simulated-sensor.interface';
+import { StartSimulationDto } from './dto/start-simulation.dto';
 
 @Injectable()
 export class SimulationService {
   private readonly logger = new Logger(SimulationService.name);
   private intervalIds: NodeJS.Timeout[] = [];
-  
+
   private readonly NUM_SENSORS = 3;
   private readonly EMIT_INTERVAL_MS = 5000;
-  
+
   constructor(private readonly sensorsService: SensorsService) {}
 
   private readonly locations = [
@@ -48,25 +49,48 @@ export class SimulationService {
     return sensors;
   }
 
-  startSimulation(){
+  startSimulation(config?: StartSimulationDto) {
     if (this.intervalIds.length > 0) {
       return { message: 'La simulación ya está en ejecución' };
     }
-    for (let i = 0; i < this.NUM_SENSORS; i++) {
-      const sensorId = `sensor-sim-${i + 1}`;
+
+    const sensorConfigs =
+      config?.sensors && config.sensors.length > 0
+        ? config.sensors
+        : this.buildDefaultSensorConfigs(config);
+
+    sensorConfigs.forEach((sensorConfig) => {
       const intervalId = setInterval(() => {
-        void this.generateAndSendReading(sensorId);
-      }, this.EMIT_INTERVAL_MS);
+        void this.generateAndSendReading(sensorConfig.sensorId);
+      }, sensorConfig.frequencyMs);
 
       this.intervalIds.push(intervalId);
-    }
-    return { message: 'Simulación iniciada correctamente' };
+
+      this.logger.log(
+        `Simulación iniciada para ${sensorConfig.sensorId} cada ${sensorConfig.frequencyMs} ms`,
+      );
+    });
+
+    return {
+      message: 'Simulación iniciada correctamente',
+      sensors: sensorConfigs,
+    };
   }
 
   stopSimulation() {
     this.intervalIds.forEach((interval) => clearInterval(interval));
     this.intervalIds = [];
     return { message: 'Simulación detenida correctamente' };
+  }
+
+  private buildDefaultSensorConfigs(config?: StartSimulationDto) {
+    const quantity = config?.quantity ?? this.NUM_SENSORS;
+    const frequencyMs = config?.frequencyMs ?? this.EMIT_INTERVAL_MS;
+
+    return Array.from({ length: quantity }, (_, index) => ({
+      sensorId: `sensor-sim-${index + 1}`,
+      frequencyMs,
+    }));
   }
 
   private async generateAndSendReading(sensorId: string): Promise<void> {

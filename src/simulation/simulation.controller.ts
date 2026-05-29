@@ -1,6 +1,7 @@
-import { Controller, Get, Post, Query } from '@nestjs/common';
-import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { ApiBody, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { SimulationService } from './simulation.service';
+import { StartSimulationDto } from './dto/start-simulation.dto';
 
 @ApiTags('Simulation')
 @Controller('simulation')
@@ -22,8 +23,31 @@ export class SimulationController {
 
   @Post('start')
   @ApiOperation({ summary: 'Iniciar simulación automática' })
-  startSimulation() {
-    return this.simulationService.startSimulation();
+  @ApiBody({
+    required: false,
+    type: StartSimulationDto,
+    examples: {
+      globalFrequency: {
+        summary: 'Frecuencia global',
+        value: {
+          quantity: 3,
+          frequencyMs: 5000,
+        },
+      },
+      multipleFrequencies: {
+        summary: 'Múltiples frecuencias',
+        value: {
+          sensors: [
+            { sensorId: 'sensor-sim-1', frequencyMs: 1000 },
+            { sensorId: 'sensor-sim-2', frequencyMs: 3000 },
+            { sensorId: 'sensor-sim-3', frequencyMs: 5000 },
+          ],
+        },
+      },
+    },
+  })
+  startSimulation(@Body() body?: StartSimulationDto) {
+    return this.simulationService.startSimulation(body);
   }
 
   @Post('stop')

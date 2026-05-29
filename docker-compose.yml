@@ -21,3 +21,5 @@ services:
 
 volumes:
   sensores_mongo_data:
+    external: true
+    name: backend_sensores_mongo_data

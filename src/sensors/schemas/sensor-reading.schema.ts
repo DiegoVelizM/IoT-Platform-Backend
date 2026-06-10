@@ -1,36 +1,56 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
+import {
+  ConnectionStatus,
+  MedicalSensorType,
+} from '../dto/create-sensor-reading.dto';
 
 export type SensorReadingDocument = HydratedDocument<SensorReading>;
 
 @Schema({ timestamps: true })
 export class SensorReading {
-    @Prop({ required: true })
-    sensorId!: string;
+  @Prop({ required: true })
+  sensorId!: string;
 
-    @Prop({ required: true })
-    location!: string;
+  @Prop({ required: true })
+  assetId!: string;
 
-    @Prop({ required: true })
-    temperature!: number;
+  @Prop({
+    required: true,
+    enum: Object.values(MedicalSensorType),
+  })
+  sensorType!: MedicalSensorType;
 
-    @Prop({ required: true })
-    humidity!: number;
+  @Prop()
+  batteryLevel?: number;
 
-    @Prop({ required: true })
-    gasLevel!: number;
+  @Prop({
+    enum: Object.values(ConnectionStatus),
+    default: ConnectionStatus.CONNECTED,
+  })
+  connectionStatus?: ConnectionStatus;
 
-    @Prop({ required: true })
-    batteryLevel!: number;
+  /*@Prop()
+  signalStrength?: number;
+  */
 
-    @Prop({ required: true })
-    latitude!: number;
+  @Prop()
+  temperature?: number;
 
-    @Prop({ required: true })
-    longitude!: number;
+  @Prop()
+  glucoseLevel?: number;
 
-    @Prop({ required: true, default: Date.now })
-    timestamp!: Date;
+  @Prop()
+  oxygenSaturation?: number;
+
+  @Prop()
+  heartRate?: number;
+
+  @Prop()
+  systolicPressure?: number;
+
+  @Prop()
+  diastolicPressure?: number;
 }
 
 export const SensorReadingSchema = SchemaFactory.createForClass(SensorReading);

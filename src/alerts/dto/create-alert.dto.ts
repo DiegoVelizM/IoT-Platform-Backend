@@ -3,11 +3,11 @@ import { IsBoolean, IsIn, IsOptional, IsString } from 'class-validator';
 
 export class CreateAlertDto {
 
-    @ApiProperty({ example: 'ESP32-001' })
+    @ApiProperty({ example: 'OXI-001' })
     @IsString()
     sensorId!: string;
 
-    @ApiProperty({ example: 'gas_detected' })
+    @ApiProperty({ example: 'oxygen_saturation_low' })
     @IsString()
     type!: string;
 
@@ -15,7 +15,7 @@ export class CreateAlertDto {
     @IsIn(['warning', 'critical'])
     severity!: 'warning' | 'critical';
 
-    @ApiProperty({ example: 'Gas level exceeded threshold' })
+    @ApiProperty({ example: 'Oxygen saturation below expected range' })
     @IsString()
     message!: string;
 

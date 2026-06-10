@@ -1,7 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { SensorsService } from '../sensors/sensors.service';
-import { CreateSensorReadingDto } from 'src/sensors/dto/create-sensor-reading.dto';
-import { SimulatedSensor, SensorType } from './interfaces/simulated-sensor.interface';
+import {
+  ConnectionStatus,
+  CreateSensorReadingDto,
+  MedicalSensorType,
+} from 'src/sensors/dto/create-sensor-reading.dto';
+import { SimulatedSensor } from './interfaces/simulated-sensor.interface';
 import { StartSimulationDto } from './dto/start-simulation.dto';
 
 @Injectable()
@@ -9,44 +13,14 @@ export class SimulationService {
   private readonly logger = new Logger(SimulationService.name);
   private intervalIds: NodeJS.Timeout[] = [];
 
-  private readonly NUM_SENSORS = 3;
   private readonly EMIT_INTERVAL_MS = 5000;
 
   constructor(private readonly sensorsService: SensorsService) {}
 
-  private readonly locations = [
-    { name: 'Sector A', latitude: -29.9533, longitude: -71.3436 },
-    { name: 'Sector B', latitude: -29.9642, longitude: -71.3381 },
-    { name: 'Sector C', latitude: -29.9488, longitude: -71.3602 },
-  ];
+  generateSensors(quantity = 4): SimulatedSensor[] {
+    const defaultSensors = this.getDefaultMedicalSensors();
 
-  private readonly sensorTypes: SensorType[] = [
-    'temperature',
-    'humidity',
-    'gas',
-    'gps',
-    'multi',
-  ];
-
-  generateSensors(quantity = 5): SimulatedSensor[] {
-    const sensors: SimulatedSensor[] = [];
-
-    for (let i = 1; i <= quantity; i++) {
-      const location = this.getRandomLocation();
-      const type = this.getRandomSensorType();
-
-      sensors.push({
-        sensorId: `SENSOR-${String(i).padStart(3, '0')}`,
-        type,
-        location: location.name,
-        latitude: location.latitude,
-        longitude: location.longitude,
-        batteryLevel: this.getRandomBatteryLevel(),
-        status: 'active',
-      });
-    }
-
-    return sensors;
+    return defaultSensors.slice(0, quantity);
   }
 
   startSimulation(config?: StartSimulationDto) {
@@ -80,52 +54,131 @@ export class SimulationService {
   stopSimulation() {
     this.intervalIds.forEach((interval) => clearInterval(interval));
     this.intervalIds = [];
+
     return { message: 'Simulación detenida correctamente' };
   }
 
   private buildDefaultSensorConfigs(config?: StartSimulationDto) {
-    const quantity = config?.quantity ?? this.NUM_SENSORS;
     const frequencyMs = config?.frequencyMs ?? this.EMIT_INTERVAL_MS;
 
-    return Array.from({ length: quantity }, (_, index) => ({
-      sensorId: `sensor-sim-${index + 1}`,
+    return this.getDefaultMedicalSensors().map((sensor) => ({
+      sensorId: sensor.sensorId,
       frequencyMs,
     }));
   }
 
   private async generateAndSendReading(sensorId: string): Promise<void> {
-    const location = this.getRandomLocation();
+    const sensorType = this.getMedicalSensorTypeFromId(sensorId);
 
     const reading: CreateSensorReadingDto = {
       sensorId,
-      location: location.name,
-      temperature: +(20 + Math.random() * 40).toFixed(2),
-      humidity: +(30 + Math.random() * 50).toFixed(2),
-      gasLevel: +(20 + Math.random() * 90).toFixed(2),
-      batteryLevel: +(5 + Math.random() * 95).toFixed(2),
-      latitude: location.latitude,
-      longitude: location.longitude,
+      assetId: this.getAssetIdFromSensor(sensorId),
+      sensorType,
+      batteryLevel: +(20 + Math.random() * 80).toFixed(2),
+      connectionStatus: ConnectionStatus.CONNECTED,
+      /*signalStrength: Math.floor(-85 + Math.random() * 45),*/
+      ...this.generateMedicalValues(sensorType),
     };
 
     try {
       await this.sensorsService.create(reading);
-      this.logger.debug(`Lectura simulada guardada para ${sensorId}`);
+      this.logger.debug(`Lectura médica simulada guardada para ${sensorId}`);
     } catch (error) {
-      this.logger.error(`Error guardando lectura simulada: ${error}`);
+      this.logger.error(`Error guardando lectura médica simulada: ${error}`);
     }
   }
 
-  private getRandomLocation() {
-    const index = Math.floor(Math.random() * this.locations.length);
-    return this.locations[index];
+  private getDefaultMedicalSensors(): SimulatedSensor[] {
+    return [
+      {
+        sensorId: 'THERMO-001',
+        assetId: 'MEDKIT-001',
+        type: MedicalSensorType.THERMOMETER,
+        batteryLevel: this.getRandomBatteryLevel(),
+        status: 'active',
+      },
+      {
+        sensorId: 'GLUCO-001',
+        assetId: 'PATIENT-001',
+        type: MedicalSensorType.GLUCOMETER,
+        batteryLevel: this.getRandomBatteryLevel(),
+        status: 'active',
+      },
+      {
+        sensorId: 'OXI-001',
+        assetId: 'PATIENT-001',
+        type: MedicalSensorType.PULSE_OXIMETER,
+        batteryLevel: this.getRandomBatteryLevel(),
+        status: 'active',
+      },
+      {
+        sensorId: 'BP-001',
+        assetId: 'PATIENT-001',
+        type: MedicalSensorType.SPHYGMOMANOMETER,
+        batteryLevel: this.getRandomBatteryLevel(),
+        status: 'active',
+      },
+    ];
   }
 
-  private getRandomSensorType(): SensorType {
-    const index = Math.floor(Math.random() * this.sensorTypes.length);
-    return this.sensorTypes[index];
+  private getMedicalSensorTypeFromId(sensorId: string): MedicalSensorType {
+    if (sensorId.includes('THERMO')) {
+      return MedicalSensorType.THERMOMETER;
+    }
+
+    if (sensorId.includes('GLUCO')) {
+      return MedicalSensorType.GLUCOMETER;
+    }
+
+    if (sensorId.includes('OXI')) {
+      return MedicalSensorType.PULSE_OXIMETER;
+    }
+
+    if (sensorId.includes('BP')) {
+      return MedicalSensorType.SPHYGMOMANOMETER;
+    }
+
+    return MedicalSensorType.PULSE_OXIMETER;
+  }
+
+  private getAssetIdFromSensor(sensorId: string): string {
+    if (sensorId.includes('THERMO')) {
+      return 'MEDKIT-001';
+    }
+
+    return 'PATIENT-001';
+  }
+
+  private generateMedicalValues(sensorType: MedicalSensorType) {
+    switch (sensorType) {
+      case MedicalSensorType.THERMOMETER:
+        return {
+          temperature: +(2 + Math.random() * 8).toFixed(2),
+        };
+
+      case MedicalSensorType.GLUCOMETER:
+        return {
+          glucoseLevel: Math.floor(70 + Math.random() * 130),
+        };
+
+      case MedicalSensorType.PULSE_OXIMETER:
+        return {
+          oxygenSaturation: Math.floor(90 + Math.random() * 10),
+          heartRate: Math.floor(60 + Math.random() * 60),
+        };
+
+      case MedicalSensorType.SPHYGMOMANOMETER:
+        return {
+          systolicPressure: Math.floor(100 + Math.random() * 60),
+          diastolicPressure: Math.floor(60 + Math.random() * 40),
+        };
+
+      default:
+        return {};
+    }
   }
 
   private getRandomBatteryLevel(): number {
-    return Math.floor(Math.random() * 101);
+    return Math.floor(20 + Math.random() * 81);
   }
 }

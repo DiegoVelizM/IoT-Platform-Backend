@@ -6,9 +6,7 @@ import { Alert, AlertSchema } from './schemas/alert.schema';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([
-      { name: Alert.name, schema: AlertSchema },
-    ]),
+    MongooseModule.forFeature([{ name: Alert.name, schema: AlertSchema }]),
   ],
   controllers: [AlertsController],
   providers: [AlertsService],

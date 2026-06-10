@@ -7,21 +7,18 @@ import { CreateAlertDto } from './dto/create-alert.dto';
 @ApiTags('Alerts')
 @Controller('alerts')
 export class AlertsController {
-
-  constructor(
-      private readonly alertsService: AlertsService,
-  ) {}
+  constructor(private readonly alertsService: AlertsService) {}
 
   @Post()
   @ApiOperation({ summary: 'Crear alerta' })
   create(@Body() createAlertDto: CreateAlertDto) {
-      return this.alertsService.create(createAlertDto);
+    return this.alertsService.create(createAlertDto);
   }
 
   @Get()
   @ApiOperation({ summary: 'Obtener alertas' })
   findAll() {
-      return this.alertsService.findAll();
+    return this.alertsService.findAll();
   }
 
   @Get('sensor/:sensorId')

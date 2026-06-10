@@ -5,11 +5,13 @@ import { HealthService } from './health.service';
 @ApiTags('Health')
 @Controller('health')
 export class HealthController {
-    constructor(private readonly healthService: HealthService) {}
+  constructor(private readonly healthService: HealthService) {}
 
-    @Get()
-    @ApiOperation({ summary: 'Verificar estado del backend y conexión a base de datos' })
-    getHealth() {
-        return this.healthService.getHealth();
-    }
+  @Get()
+  @ApiOperation({
+    summary: 'Verificar estado del backend y conexión a base de datos',
+  })
+  getHealth() {
+    return this.healthService.getHealth();
+  }
 }

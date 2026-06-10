@@ -1,16 +1,19 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Post, UseGuards, UsePipes } from '@nestjs/common';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { CreateSensorReadingDto } from '../sensors/dto/create-sensor-reading.dto';
+import { SensorReadingValidationPipe } from '../common/pipes/sensor-reading-validation.pipe';
 import { SensorsService } from '../sensors/sensors.service';
 
 @ApiTags('Telemetry')
 @Controller('telemetry')
 export class TelemetryController {
-    constructor(private readonly sensorsService: SensorsService) {}
+  constructor(private readonly sensorsService: SensorsService) {}
 
-    @Post()
-    @ApiOperation({ summary: 'Recibir telemetría de sensores simulados' })
-    create(@Body() createSensorReadingDto: CreateSensorReadingDto) {
-        return this.sensorsService.create(createSensorReadingDto);
-    }
+  @Post()
+  @UseGuards(ThrottlerGuard)
+  @ApiOperation({ summary: 'Recibir telemetría de sensores simulados' })
+  @UsePipes(new SensorReadingValidationPipe())
+  create(@Body() createSensorReadingDto: any) {
+    return this.sensorsService.create(createSensorReadingDto);
+  }
 }

@@ -18,7 +18,9 @@ async function bootstrap() {
 
   const config = new DocumentBuilder()
     .setTitle('API Sensores Simulados')
-    .setDescription('API para recibir, almacenar y exponer datos de sensores simulados')
+    .setDescription(
+      'API para recibir, almacenar y exponer datos de sensores simulados',
+    )
     .setVersion('1.0')
     .build();
 

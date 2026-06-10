@@ -55,4 +55,12 @@ export class SimulationController {
   stopSimulation() {
     return this.simulationService.stopSimulation();
   }
+
+  @Post('medical/start')
+  @ApiOperation({
+    summary: 'Iniciar simulación médica (pacientes y sensores médicos)',
+  })
+  startMedicalSimulation() {
+    return this.simulationService.startMedicalSimulation();
+  }
 }

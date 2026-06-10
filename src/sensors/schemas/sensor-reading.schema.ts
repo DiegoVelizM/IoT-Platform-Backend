@@ -3,34 +3,23 @@ import { HydratedDocument } from 'mongoose';
 
 export type SensorReadingDocument = HydratedDocument<SensorReading>;
 
-@Schema({ timestamps: true })
+@Schema({
+  collection: 'sensor_readings',
+  timestamps: true,
+  discriminatorKey: 'sensor_type',
+})
 export class SensorReading {
-    @Prop({ required: true })
-    sensorId!: string;
+  @Prop({ required: true })
+  sensor_id!: string;
 
-    @Prop({ required: true })
-    location!: string;
+  @Prop()
+  asset_id?: string;
 
-    @Prop({ required: true })
-    temperature!: number;
+  @Prop({ required: true })
+  sensor_type!: string;
 
-    @Prop({ required: true })
-    humidity!: number;
-
-    @Prop({ required: true })
-    gasLevel!: number;
-
-    @Prop({ required: true })
-    batteryLevel!: number;
-
-    @Prop({ required: true })
-    latitude!: number;
-
-    @Prop({ required: true })
-    longitude!: number;
-
-    @Prop({ required: true, default: Date.now })
-    timestamp!: Date;
+  @Prop({ required: true, default: Date.now })
+  timestamp!: Date;
 }
 
 export const SensorReadingSchema = SchemaFactory.createForClass(SensorReading);

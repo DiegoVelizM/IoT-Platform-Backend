@@ -5,9 +5,11 @@ export type AlertDocument = HydratedDocument<Alert>;
 
 @Schema({ timestamps: true })
 export class Alert {
-
   @Prop({ required: true })
   sensorId!: string;
+
+  @Prop()
+  assetId?: string;
 
   @Prop({ required: true })
   type!: string;

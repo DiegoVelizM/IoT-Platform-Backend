@@ -15,8 +15,8 @@ describe('AppController', () => {
   });
 
   describe('root', () => {
-    it('should return "Hello World!"', () => {
-      expect(appController.getHello()).toBe('Hello World!');
+    it('should return the application greeting', () => {
+      expect(appController.getHello()).toBe('IoT Platform API is running!');
     });
   });
 });

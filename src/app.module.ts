@@ -9,7 +9,7 @@ import { HealthModule } from './health/health.module';
 import { EventsModule } from './events/events.module';
 import { AlertsModule } from './alerts/alerts.module';
 import { SimulationModule } from './simulation/simulation.module';
-
+import { KafkaModule } from './kafka/kafka.module';
 
 @Module({
   imports: [
@@ -22,6 +22,7 @@ import { SimulationModule } from './simulation/simulation.module';
     HealthModule,
     EventsModule,
     AlertsModule,
+    KafkaModule,
     SimulationModule,
   ],
   controllers: [AppController],

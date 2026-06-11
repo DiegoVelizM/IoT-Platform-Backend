@@ -13,7 +13,7 @@ export class SimulationController {
   @ApiQuery({
     name: 'quantity',
     required: false,
-    example: 5,
+    example: 4,
     description: 'Cantidad de sensores simulados a generar',
   })
   generateSensors(@Query('quantity') quantity?: string) {
@@ -30,17 +30,17 @@ export class SimulationController {
       globalFrequency: {
         summary: 'Frecuencia global',
         value: {
-          quantity: 3,
           frequencyMs: 5000,
         },
       },
       multipleFrequencies: {
-        summary: 'Múltiples frecuencias',
+        summary: 'Múltiples frecuencias médicas',
         value: {
           sensors: [
-            { sensorId: 'sensor-sim-1', frequencyMs: 1000 },
-            { sensorId: 'sensor-sim-2', frequencyMs: 3000 },
-            { sensorId: 'sensor-sim-3', frequencyMs: 5000 },
+            { sensorId: 'OXI-001', frequencyMs: 1000 },
+            { sensorId: 'GLUCO-001', frequencyMs: 3000 },
+            {sensorId: 'THERMO-001', frequencyMs: 5000 },
+            { sensorId: 'BP-001', frequencyMs: 10000 },
           ],
         },
       },

@@ -1,13 +1,11 @@
-export type SensorType = 'temperature' | 'humidity' | 'gas' | 'gps' | 'multi';
+import { MedicalSensorType } from 'src/sensors/dto/create-sensor-reading.dto';
 
 export type SensorStatus = 'active' | 'inactive' | 'offline';
 
 export interface SimulatedSensor {
-    sensorId: string;
-    type: SensorType;
-    location: string;
-    latitude: number;
-    longitude: number;
-    batteryLevel: number;
-    status: SensorStatus;
+  sensorId: string;
+  assetId: string;
+  type: MedicalSensorType;
+  batteryLevel: number;
+  status: SensorStatus;
 }

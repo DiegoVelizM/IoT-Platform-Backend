@@ -26,37 +26,136 @@ export class SensorsService {
         return saveReading;
     }
 
-    private async generateAlertsFromTelemetry(data: CreateSensorReadingDto) {
-        if (data.batteryLevel < 20) {
-            await this.alertsService.create({
-                sensorId: data.sensorId,
-                type: 'low_battery',
-                severity: data.batteryLevel < 10 ? 'critical' : 'warning',
-                message: `Battery level is low: ${data.batteryLevel}%`,
-                resolved: false,
-            });
-        }
+    private async generateAlertsFromTelemetry(
+      data: CreateSensorReadingDto,
+  ) {
+    // Batería baja
+    if (
+      data.batteryLevel !== undefined &&
+      data.batteryLevel < 20
+    ) {
+      await this.alertsService.create({
+        sensorId: data.sensorId,
+        type: 'low_battery',
+        severity: data.batteryLevel < 10 ? 'critical' : 'warning',
+        message: `Battery level is low: ${data.batteryLevel}%`,
+        resolved: false,
+      });
+    }
 
-        if (data.temperature > 40) {
-            await this.alertsService.create({
-                sensorId: data.sensorId,
-                type: 'temperature_out_of_range',
-                severity: data.temperature > 50 ? 'critical' : 'warning',
-                message: `Temperature exceeded threshold: ${data.temperature}°C`,
-                resolved: false,
-            });
-        }
+    // Sensor desconectado
+    if (data.connectionStatus === 'offline') {
+      await this.alertsService.create({
+        sensorId: data.sensorId,
+        type: 'sensor_offline',
+        severity: 'critical',
+        message: 'Sensor is offline',
+        resolved: false,
+      });
+    }
 
-        if (data.gasLevel > 70) {
-            await this.alertsService.create({
-                sensorId: data.sensorId,
-                type: 'gas_critical',
-                severity: data.gasLevel > 85 ? 'critical' : 'warning',
-                message: `Gas level exceeded threshold: ${data.gasLevel}`,
-                resolved: false,
-            });
-        }
-}
+    // Pérdida de señal
+    /*if (
+      data.signalStrength !== undefined &&
+      data.signalStrength <= -90
+    ) {
+      await this.alertsService.create({
+        sensorId: data.sensorId,
+        type: 'signal_lost',
+        severity: 'warning',
+        message: `Weak signal detected: ${data.signalStrength} dBm`,
+        resolved: false,
+      });
+    }*/
+
+    // Termómetro (cadena de frío)
+    if (
+      data.temperature !== undefined &&
+      (data.temperature < 2 || data.temperature > 8)
+    ) {
+      await this.alertsService.create({
+        sensorId: data.sensorId,
+        type: 'temperature_out_of_range',
+        severity: 'warning',
+        message: `Temperature out of range: ${data.temperature}°C`,
+        resolved: false,
+      });
+    }
+
+    // Glucómetro
+    if (
+      data.glucoseLevel !== undefined &&
+      (data.glucoseLevel < 70 || data.glucoseLevel > 180)
+    ) {
+      await this.alertsService.create({
+        sensorId: data.sensorId,
+        type: 'glucose_out_of_range',
+        severity:
+          data.glucoseLevel < 55 || data.glucoseLevel > 250
+            ? 'critical'
+            : 'warning',
+        message: `Glucose level out of range: ${data.glucoseLevel}`,
+        resolved: false,
+      });
+    }
+
+    // Pulsioxímetro
+    if (
+      data.oxygenSaturation !== undefined &&
+      data.oxygenSaturation < 92
+    ) {
+      await this.alertsService.create({
+        sensorId: data.sensorId,
+        type: 'oxygen_saturation_low',
+        severity:
+          data.oxygenSaturation < 88
+            ? 'critical'
+            : 'warning',
+        message: `Low oxygen saturation: ${data.oxygenSaturation}%`,
+        resolved: false,
+      });
+    }
+
+    if (
+      data.heartRate !== undefined &&
+      (data.heartRate < 50 || data.heartRate > 120)
+    ) {
+      await this.alertsService.create({
+        sensorId: data.sensorId,
+        type: 'heart_rate_out_of_range',
+        severity:
+          data.heartRate < 40 || data.heartRate > 140
+            ? 'critical'
+            : 'warning',
+        message: `Heart rate out of range: ${data.heartRate} bpm`,
+        resolved: false,
+      });
+    }
+
+  // Presión arterial
+  if (
+    data.systolicPressure !== undefined &&
+    data.diastolicPressure !== undefined &&
+    (
+      data.systolicPressure >= 140 ||
+      data.diastolicPressure >= 90
+    )
+  ) {
+    await this.alertsService.create({
+      sensorId: data.sensorId,
+      type: 'blood_pressure_high',
+      severity:
+        data.systolicPressure >= 180 ||
+        data.diastolicPressure >= 120
+          ? 'critical'
+          : 'warning',
+      message:
+        `Blood pressure elevated: ` +
+        `${data.systolicPressure}/${data.diastolicPressure}`,
+      resolved: false,
+      });
+    }
+  }
 
     async findAll() {
         return this.sensorReadingModel.find().sort({ createdAt: -1 }).exec();

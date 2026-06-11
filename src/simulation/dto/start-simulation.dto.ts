@@ -12,8 +12,8 @@ import { Type } from 'class-transformer';
 
 export class SimulatedSensorFrequencyDto {
   @ApiPropertyOptional({
-    example: 'sensor-sim-1',
-    description: 'ID del sensor simulado',
+    example: 'OXI-001',
+    description: 'ID del sensor médico simulado',
   })
   @IsString()
   sensorId!: string;
@@ -30,8 +30,8 @@ export class SimulatedSensorFrequencyDto {
 
 export class StartSimulationDto {
   @ApiPropertyOptional({
-    example: 3,
-    description: 'Cantidad de sensores simulados a iniciar',
+    example: 4,
+    description: 'Cantidad de sensores médicos simulados a iniciar',
   })
   @IsOptional()
   @IsInt()

@@ -81,6 +81,20 @@ export class SensorsService {
         message: 'Sensor is offline',
         resolved: false,
       });
+
+      await this.kafkaProducer.emit(
+        KAFKA_TOPICS.SENSOR_OFFLINE,
+        {
+          eventId: randomUUID(),
+          eventType: EventType.SENSOR_OFFLINE,
+          occurredAt: new Date(),
+          source: 'iot-platform',
+          sensorId: data.sensorId,
+          assetId: data.assetId,
+          sensorType: data.sensorType,
+          connectionStatus: data.connectionStatus,
+        },
+      );
     }
 
     // Pérdida de señal

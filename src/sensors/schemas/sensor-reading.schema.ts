@@ -30,10 +30,6 @@ export class SensorReading {
   })
   connectionStatus?: ConnectionStatus;
 
-  /*@Prop()
-  signalStrength?: number;
-  */
-
   @Prop()
   temperature?: number;
 

@@ -97,20 +97,6 @@ export class SensorsService {
       );
     }
 
-    // Pérdida de señal
-    /*if (
-      data.signalStrength !== undefined &&
-      data.signalStrength <= -90
-    ) {
-      await this.alertsService.create({
-        sensorId: data.sensorId,
-        type: 'signal_lost',
-        severity: 'warning',
-        message: `Weak signal detected: ${data.signalStrength} dBm`,
-        resolved: false,
-      });
-    }*/
-
     // Termómetro (cadena de frío)
     if (
       data.temperature !== undefined &&

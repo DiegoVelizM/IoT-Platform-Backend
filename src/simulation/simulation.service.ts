@@ -76,7 +76,6 @@ export class SimulationService {
       sensorType,
       batteryLevel: +(20 + Math.random() * 80).toFixed(2),
       connectionStatus: ConnectionStatus.CONNECTED,
-      /*signalStrength: Math.floor(-85 + Math.random() * 45),*/
       ...this.generateMedicalValues(sensorType),
     };
 

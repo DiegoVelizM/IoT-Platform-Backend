@@ -4,6 +4,10 @@ import { Model } from 'mongoose';
 import { CreateSensorReadingDto } from './dto/create-sensor-reading.dto';
 import { SensorReading } from './schemas/sensor-reading.schema';
 import { AlertsService } from '../alerts/alerts.service';
+import { KafkaProducerService } from '../kafka/kafka-producer.service';
+import { KAFKA_TOPICS } from '../kafka/kafka-topics.constants';
+import { EventType } from '../common/events/event-types';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class SensorsService {
@@ -11,6 +15,7 @@ export class SensorsService {
         @InjectModel(SensorReading.name)
         private sensorReadingModel: Model<SensorReading>,
         private readonly alertsService: AlertsService,
+        private readonly kafkaProducer: KafkaProducerService,
     ) {}
 
     async create(createSensorReadingDto: CreateSensorReadingDto) {
@@ -20,6 +25,30 @@ export class SensorsService {
         });
         
         const saveReading = await reading.save();
+
+        await this.kafkaProducer.emit(
+          KAFKA_TOPICS.TELEMETRY_RECEIVED,
+          {
+            eventId: randomUUID(),
+            eventType: EventType.TELEMETRY_RECEIVED,
+            occurredAt: new Date(),
+            source: 'iot-platform',
+
+            sensorId: saveReading.sensorId,
+            assetId: saveReading.assetId,
+            sensorType: saveReading.sensorType,
+
+            batteryLevel: saveReading.batteryLevel,
+            connectionStatus: saveReading.connectionStatus,
+
+            temperature: saveReading.temperature,
+            glucoseLevel: saveReading.glucoseLevel,
+            oxygenSaturation: saveReading.oxygenSaturation,
+            heartRate: saveReading.heartRate,
+            systolicPressure: saveReading.systolicPressure,
+            diastolicPressure: saveReading.diastolicPressure,
+          },
+        );
 
         await this.generateAlertsFromTelemetry(createSensorReadingDto);
 
@@ -52,6 +81,20 @@ export class SensorsService {
         message: 'Sensor is offline',
         resolved: false,
       });
+
+      await this.kafkaProducer.emit(
+        KAFKA_TOPICS.SENSOR_OFFLINE,
+        {
+          eventId: randomUUID(),
+          eventType: EventType.SENSOR_OFFLINE,
+          occurredAt: new Date(),
+          source: 'iot-platform',
+          sensorId: data.sensorId,
+          assetId: data.assetId,
+          sensorType: data.sensorType,
+          connectionStatus: data.connectionStatus,
+        },
+      );
     }
 
     // Pérdida de señal

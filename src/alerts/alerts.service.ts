@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { randomUUID } from 'crypto';
-
 import { Alert } from './schemas/alert.schema';
 import { CreateAlertDto } from './dto/create-alert.dto';
 import { KafkaProducerService } from '../kafka/kafka-producer.service';
@@ -45,6 +44,27 @@ export class AlertsService {
         'Failed to create and publish alert',
         error instanceof Error ? error.stack : String(error),
       );
+      throw error;
+    }
+  }
+
+  async createMany(alerts: CreateAlertDto[]) {
+    if (alerts.length === 0) {
+      return [];
+    }
+
+    try {
+      const savedAlerts = await this.alertModel.insertMany(alerts);
+
+      this.logger.log(`Generated ${savedAlerts.length} alerts`);
+
+      return savedAlerts;
+    } catch (error) {
+      this.logger.error(
+        'Failed to create alerts in batch',
+        error instanceof Error ? error.stack : String(error),
+      );
+
       throw error;
     }
   }

@@ -29,6 +29,16 @@ Si bien el auditor reporta 164 hallazgos, una revisión manual permite observar 
 
 Por esta razón, los valores de **Code Quality** y **Maintainability** parecen estar fuertemente influenciados por hallazgos de bajo impacto funcional y por archivos que no forman parte de la lógica de negocio ejecutada en producción.
 
+## Observación sobre los puntajes de Calidad y Mantenibilidad
+
+Llama la atención que el auditor asigne una puntuación de 0 tanto en Code Quality como en Maintainability.
+
+Sin embargo, el mismo reporte indica aspectos positivos relacionados con la arquitectura del sistema, la separación de responsabilidades, la gestión de dependencias y el modelado del dominio.
+
+Además, una parte considerable de los hallazgos proviene de archivos de pruebas (`*.spec.ts`) y recomendaciones genéricas de análisis estático, por lo que estos puntajes parecen estar influenciados por criterios automatizados que no necesariamente reflejan el estado funcional ni arquitectónico real del proyecto.
+
+Por esta razón, los resultados deben interpretarse como indicadores automáticos de mejora y no como una evaluación definitiva de la calidad global de la solución.
+
 ## Hallazgos relevantes
 
 ### 1. Observabilidad

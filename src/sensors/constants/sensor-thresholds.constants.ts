@@ -1,0 +1,32 @@
+export const SENSOR_THRESHOLDS = {
+  BATTERY: {
+    LOW: 20,
+    CRITICAL: 10,
+  },
+  COLD_CHAIN_TEMPERATURE: {
+    MIN: 2,
+    MAX: 8,
+  },
+  GLUCOSE: {
+    LOW: 70,
+    HIGH: 180,
+    CRITICAL_LOW: 55,
+    CRITICAL_HIGH: 250,
+  },
+  OXYGEN_SATURATION: {
+    LOW: 92,
+    CRITICAL: 88,
+  },
+  HEART_RATE: {
+    LOW: 50,
+    HIGH: 120,
+    CRITICAL_LOW: 40,
+    CRITICAL_HIGH: 140,
+  },
+  BLOOD_PRESSURE: {
+    SYSTOLIC_HIGH: 140,
+    DIASTOLIC_HIGH: 90,
+    SYSTOLIC_CRITICAL: 180,
+    DIASTOLIC_CRITICAL: 120,
+  },
+} as const;

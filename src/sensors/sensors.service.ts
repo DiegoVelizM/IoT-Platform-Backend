@@ -73,13 +73,15 @@ export class SensorsService {
   }
 
   private async generateAlertsFromTelemetry(data: CreateSensorReadingDto) {
-    await this.checkBatteryAlert(data);
-    await this.checkSensorOfflineAlert(data);
-    await this.checkColdChainTemperatureAlert(data);
-    await this.checkGlucoseAlert(data);
-    await this.checkOxygenSaturationAlert(data);
-    await this.checkHeartRateAlert(data);
-    await this.checkBloodPressureAlert(data);
+    await Promise.all([
+      this.checkBatteryAlert(data),
+      this.checkSensorOfflineAlert(data),
+      this.checkColdChainTemperatureAlert(data),
+      this.checkGlucoseAlert(data),
+      this.checkOxygenSaturationAlert(data),
+      this.checkHeartRateAlert(data),
+      this.checkBloodPressureAlert(data),
+    ]);
   }
 
   private async checkBatteryAlert(data: CreateSensorReadingDto) {

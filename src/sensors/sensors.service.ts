@@ -1,8 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { randomUUID } from 'crypto';
-
 import { CreateSensorReadingDto } from './dto/create-sensor-reading.dto';
 import { SensorReading } from './schemas/sensor-reading.schema';
 import { AlertsService } from '../alerts/alerts.service';
@@ -13,6 +12,7 @@ import { SENSOR_THRESHOLDS } from './constants/sensor-thresholds.constants';
 
 @Injectable()
 export class SensorsService {
+  private readonly logger = new Logger(SensorsService.name);
   constructor(
     @InjectModel(SensorReading.name)
     private sensorReadingModel: Model<SensorReading>,
@@ -21,16 +21,32 @@ export class SensorsService {
   ) {}
 
   async create(createSensorReadingDto: CreateSensorReadingDto) {
-    const reading = new this.sensorReadingModel({
-      ...createSensorReadingDto,
-    });
+    try {
+      const reading = new this.sensorReadingModel({
+        ...createSensorReadingDto,
+      });
 
-    const savedReading = await reading.save();
+      const savedReading = await reading.save();
 
-    await this.publishTelemetryReceived(savedReading);
-    await this.generateAlertsFromTelemetry(createSensorReadingDto);
+      this.logger.log(
+        `Sensor reading saved for ${savedReading.sensorId}`,
+      );
 
-    return savedReading;
+      await this.publishTelemetryReceived(savedReading);
+      await this.generateAlertsFromTelemetry(createSensorReadingDto);
+      this.logger.log(
+        `Telemetry processed successfully for sensor ${savedReading.sensorId}`,
+      );
+
+      return savedReading;
+    } catch (error) {
+      this.logger.error(
+        `Failed to process sensor reading for ${createSensorReadingDto.sensorId}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+
+      throw error;
+    }
   }
 
   private async publishTelemetryReceived(reading: SensorReading) {

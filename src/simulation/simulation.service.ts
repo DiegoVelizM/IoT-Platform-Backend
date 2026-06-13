@@ -83,7 +83,8 @@ export class SimulationService {
       await this.sensorsService.create(reading);
       this.logger.debug(`Lectura médica simulada guardada para ${sensorId}`);
     } catch (error) {
-      this.logger.error(`Error guardando lectura médica simulada: ${error}`);
+      this.logger.error(`Error guardando lectura médica simulada para ${sensorId}`, error instanceof Error ? error.stack : String(error),
+      );
     }
   }
 

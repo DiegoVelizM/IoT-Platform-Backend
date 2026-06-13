@@ -54,12 +54,6 @@ export class CreateSensorReadingDto {
   @IsEnum(ConnectionStatus)
   connectionStatus?: ConnectionStatus;
 
-  /*@ApiPropertyOptional({ example: -45 })
-  @IsOptional()
-  @IsNumber()
-  signalStrength?: number;
-  */
-
   @ApiPropertyOptional({
     example: 5.4,
     description: 'Temperatura de insumo médico. Rango esperado simulado: 2°C a 8°C',

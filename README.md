@@ -93,6 +93,8 @@ docker volume create backend_sensores_mongo_data
 docker compose up --build
 ```
 
+El backend espera a que MongoDB, Zookeeper y Kafka estén **healthy** antes de arrancar (healthchecks en `docker-compose.yml`). El primer arranque puede tardar ~1 minuto mientras Kafka completa su boot.
+
 Servicios levantados:
 
 | Servicio | Contenedor | Puerto |

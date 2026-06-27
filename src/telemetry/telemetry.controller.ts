@@ -67,10 +67,11 @@ export class TelemetryController {
     summary: 'Recibir telemetría de sensores simulados',
     description:
       'Persiste la lectura en MongoDB, evalúa umbrales para alertas y publica el evento `telemetry_received` en Kafka. ' +
-      'Si Kafka no está disponible, la telemetría se guarda igualmente; el fallo de publicación se registra en logs.',
+      'Si Kafka falla, la telemetría se guarda y la respuesta puede incluir `warnings` con códigos KAFKA_PUBLISH_FAILED o KAFKA_CONNECTION_FAILED.',
   })
   @ApiCreatedResponse({
-    description: 'Lectura procesada y almacenada correctamente',
+    description:
+      'Lectura procesada y almacenada. Puede incluir warnings si falló la publicación en Kafka',
     type: CreateSensorReadingDto,
   })
   @ApiWriteErrors()

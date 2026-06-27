@@ -11,10 +11,9 @@ export class HealthController {
 
   @Get()
   @ApiOperation({
-    summary: 'Verificar estado del backend y conexión a base de datos',
+    summary: 'Verificar estado del backend, MongoDB y Kafka',
     description:
-      'Responde 200 aunque MongoDB esté desconectado; revise el campo `database` en el body. ' +
-      'Kafka no se incluye en este health check.',
+      'Responde 200 con status `ok` o `degraded`. Revise los campos `database` y `kafka` para detectar dependencias caídas.',
   })
   @ApiOkResponse({ type: HealthResponseDto })
   @ApiReadErrors()

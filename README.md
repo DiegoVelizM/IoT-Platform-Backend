@@ -401,31 +401,35 @@ db.alerts.find().pretty()
 
 ## Documentación de errores API
 
-Todos los endpoints REST pueden devolver errores con el siguiente formato estándar de NestJS:
+Todos los endpoints REST devuelven errores con el siguiente **formato estandarizado**:
 
 ```json
 {
   "statusCode": 400,
+  "error": "VALIDATION_ERROR",
   "message": ["sensorId must be a string"],
-  "error": "Bad Request"
+  "timestamp": "2026-06-27T12:00:00.000Z",
+  "path": "/telemetry"
 }
 ```
 
-Cuando hay un solo mensaje, `message` puede ser un string:
+### Códigos de error (`error`)
 
-```json
-{
-  "statusCode": 500,
-  "message": "Internal server error"
-}
-```
+| Código | HTTP | Descripción |
+|--------|------|-------------|
+| `VALIDATION_ERROR` | 400 | Body o parámetros inválidos |
+| `NOT_FOUND` | 404 | Recurso no encontrado |
+| `INTERNAL_ERROR` | 500 | Error interno no controlado |
+| `KAFKA_CONNECTION_FAILED` | — | Kafka no disponible (en `warnings` o `/health`) |
+| `KAFKA_PUBLISH_FAILED` | — | Fallo al publicar evento (en `warnings` o `/health`) |
 
 ### Códigos HTTP
 
 | Código | Cuándo ocurre | Endpoints afectados |
 |--------|---------------|---------------------|
 | `400 Bad Request` | Body inválido: campos requeridos ausentes, tipos incorrectos, valores fuera de rango (`@Min`/`@Max`), enums inválidos o propiedades no permitidas (`forbidNonWhitelisted`) | `POST /telemetry`, `POST /alerts`, `POST /simulation/start`, `POST /events/test` |
-| `500 Internal Server Error` | MongoDB no disponible, error al persistir o excepción no controlada | Todos los que leen/escriben en base de datos |
+| `404 Not Found` | No existen lecturas o alertas para el identificador consultado | `GET /sensors/latest`, `GET /sensors/sensor/:sensorId`, `GET /alerts/sensor/:sensorId` |
+| `500 Internal Server Error` | MongoDB no disponible, error al persistir o excepción no controlada | Endpoints que leen/escriben en base de datos |
 
 ### Ejemplos por endpoint
 
@@ -434,54 +438,63 @@ Cuando hay un solo mensaje, `message` puede ser un string:
 ```json
 {
   "statusCode": 400,
+  "error": "VALIDATION_ERROR",
   "message": [
     "sensorId must be a string",
     "assetId must be a string",
     "sensorType must be one of the following values: thermometer, glucometer, pulse_oximeter, sphygmomanometer"
   ],
-  "error": "Bad Request"
+  "timestamp": "2026-06-27T12:00:00.000Z",
+  "path": "/telemetry"
 }
 ```
 
-**POST /telemetry — propiedad no permitida:**
+**GET /sensors/sensor/UNKNOWN-001 — sin lecturas:**
 
 ```json
 {
-  "statusCode": 400,
-  "message": ["property humidity should not exist"],
-  "error": "Bad Request"
+  "statusCode": 404,
+  "error": "NOT_FOUND",
+  "message": "Sensor readings not found for identifier \"UNKNOWN-001\"",
+  "timestamp": "2026-06-27T12:00:00.000Z",
+  "path": "/sensors/sensor/UNKNOWN-001"
 }
 ```
 
-**POST /alerts — severidad inválida:**
+**GET /health — MongoDB o Kafka desconectados:**
+
+Responde `200 OK` con `status: "degraded"`:
 
 ```json
 {
-  "statusCode": 400,
-  "message": ["severity must be one of the following values: warning, critical"],
-  "error": "Bad Request"
-}
-```
-
-**GET /health — MongoDB desconectado:**
-
-Responde `200 OK` con cuerpo informativo (no es un error HTTP):
-
-```json
-{
-  "status": "ok",
+  "status": "degraded",
   "service": "iot-platform-backend",
-  "database": "disconnected",
+  "database": "connected",
+  "kafka": {
+    "connected": false,
+    "broker": "kafka:9092",
+    "lastError": "Connection error",
+    "lastErrorCode": "KAFKA_CONNECTION_FAILED"
+  },
   "timestamp": "2026-06-27T12:00:00.000Z"
 }
 ```
 
-**Cualquier GET — MongoDB caído:**
+**POST /telemetry — Kafka caído (telemetría guardada):**
+
+Responde `201` con warnings opcionales:
 
 ```json
 {
-  "statusCode": 500,
-  "message": "Internal server error"
+  "sensorId": "OXI-001",
+  "assetId": "PATIENT-001",
+  "warnings": [
+    {
+      "code": "KAFKA_PUBLISH_FAILED",
+      "message": "Failed to publish event to topic telemetry_received",
+      "topic": "telemetry_received"
+    }
+  ]
 }
 ```
 
@@ -491,14 +504,14 @@ Responde `200 OK` con cuerpo informativo (no es un error HTTP):
 
 ## Documentación de errores Kafka
 
-El productor Kafka (`KafkaProducerService`) opera de forma **no bloqueante** respecto a la API REST: un fallo de Kafka **no impide** que la telemetría o las alertas se guarden en MongoDB.
+El productor Kafka (`KafkaProducerService`) opera de forma **no bloqueante** respecto a la API REST: un fallo de Kafka **no impide** que la telemetría o las alertas se guarden en MongoDB. Los fallos se reportan mediante códigos estandarizados (`KAFKA_CONNECTION_FAILED`, `KAFKA_PUBLISH_FAILED`) en el array `warnings` de las respuestas de escritura y en el endpoint `/health`.
 
 ### Escenarios de error
 
 | Escenario | Comportamiento de la API | Log del servidor |
 |-----------|--------------------------|------------------|
 | Broker no disponible al iniciar | La app arranca igualmente; Kafka queda desconectado | `Kafka connect error` |
-| Fallo al publicar evento | La operación HTTP termina con éxito (201/200) | `Failed to send message to topic <topic>` |
+| Fallo al publicar evento | La operación HTTP termina con éxito (201/200) y `warnings` en el body | `Failed to send message to topic <topic>` |
 | Productor desconectado al emitir | Intenta reconectar automáticamente antes de enviar | `Kafka producer disconnected. Reconnecting...` |
 | Reconexión exitosa | El evento se publica normalmente | `Message sent to topic <topic>` |
 | Reconexión fallida | La operación HTTP sigue siendo exitosa; el evento no se publica | `Failed to send message to topic <topic>` |
@@ -550,6 +563,8 @@ Proyecto académico en desarrollo activo.
 - Persistencia en MongoDB
 - Generación automática de alertas por umbrales
 - Productor Kafka con publicación de eventos
+- Estandarización de errores HTTP 400/404/500 con `HttpExceptionFilter`
+- Manejo estructurado de errores Kafka con `warnings` en respuestas y estado en `/health`
 - Documentación Swagger con respuestas de error por endpoint
 - Catálogo de errores API y Kafka en README
 - Contenerización con Docker Compose
@@ -559,7 +574,6 @@ Proyecto académico en desarrollo activo.
 - Consumidores Kafka
 - Autenticación JWT (dependencias instaladas, módulo no implementado)
 - Deduplicación y resolución de alertas activas
-- Health check de Kafka (incluir estado en `/health`)
 - Integración del endpoint `/events/test` con Kafka
 
 ---

@@ -1,5 +1,6 @@
 import { Body, Controller, Logger, Post } from '@nestjs/common';
-import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiCreatedResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiWriteErrors } from '../common/decorators/api-standard-errors.decorator';
 import { CreateSensorReadingDto } from '../sensors/dto/create-sensor-reading.dto';
 import { SensorsService } from '../sensors/sensors.service';
 
@@ -62,7 +63,17 @@ export class TelemetryController {
       },
     },
   })
-  @ApiOperation({ summary: 'Recibir telemetría de sensores simulados' })
+  @ApiOperation({
+    summary: 'Recibir telemetría de sensores simulados',
+    description:
+      'Persiste la lectura en MongoDB, evalúa umbrales para alertas y publica el evento `telemetry_received` en Kafka. ' +
+      'Si Kafka no está disponible, la telemetría se guarda igualmente; el fallo de publicación se registra en logs.',
+  })
+  @ApiCreatedResponse({
+    description: 'Lectura procesada y almacenada correctamente',
+    type: CreateSensorReadingDto,
+  })
+  @ApiWriteErrors()
   async create(@Body() createSensorReadingDto: CreateSensorReadingDto) {
     try {
       this.logger.log(

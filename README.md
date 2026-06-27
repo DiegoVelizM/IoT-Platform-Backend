@@ -399,6 +399,146 @@ db.alerts.find().pretty()
 
 ---
 
+## Documentación de errores API
+
+Todos los endpoints REST pueden devolver errores con el siguiente formato estándar de NestJS:
+
+```json
+{
+  "statusCode": 400,
+  "message": ["sensorId must be a string"],
+  "error": "Bad Request"
+}
+```
+
+Cuando hay un solo mensaje, `message` puede ser un string:
+
+```json
+{
+  "statusCode": 500,
+  "message": "Internal server error"
+}
+```
+
+### Códigos HTTP
+
+| Código | Cuándo ocurre | Endpoints afectados |
+|--------|---------------|---------------------|
+| `400 Bad Request` | Body inválido: campos requeridos ausentes, tipos incorrectos, valores fuera de rango (`@Min`/`@Max`), enums inválidos o propiedades no permitidas (`forbidNonWhitelisted`) | `POST /telemetry`, `POST /alerts`, `POST /simulation/start`, `POST /events/test` |
+| `500 Internal Server Error` | MongoDB no disponible, error al persistir o excepción no controlada | Todos los que leen/escriben en base de datos |
+
+### Ejemplos por endpoint
+
+**POST /telemetry — campo requerido ausente:**
+
+```json
+{
+  "statusCode": 400,
+  "message": [
+    "sensorId must be a string",
+    "assetId must be a string",
+    "sensorType must be one of the following values: thermometer, glucometer, pulse_oximeter, sphygmomanometer"
+  ],
+  "error": "Bad Request"
+}
+```
+
+**POST /telemetry — propiedad no permitida:**
+
+```json
+{
+  "statusCode": 400,
+  "message": ["property humidity should not exist"],
+  "error": "Bad Request"
+}
+```
+
+**POST /alerts — severidad inválida:**
+
+```json
+{
+  "statusCode": 400,
+  "message": ["severity must be one of the following values: warning, critical"],
+  "error": "Bad Request"
+}
+```
+
+**GET /health — MongoDB desconectado:**
+
+Responde `200 OK` con cuerpo informativo (no es un error HTTP):
+
+```json
+{
+  "status": "ok",
+  "service": "iot-platform-backend",
+  "database": "disconnected",
+  "timestamp": "2026-06-27T12:00:00.000Z"
+}
+```
+
+**Cualquier GET — MongoDB caído:**
+
+```json
+{
+  "statusCode": 500,
+  "message": "Internal server error"
+}
+```
+
+> La documentación interactiva de respuestas de error por endpoint está disponible en Swagger: `http://localhost:3000/docs`
+
+---
+
+## Documentación de errores Kafka
+
+El productor Kafka (`KafkaProducerService`) opera de forma **no bloqueante** respecto a la API REST: un fallo de Kafka **no impide** que la telemetría o las alertas se guarden en MongoDB.
+
+### Escenarios de error
+
+| Escenario | Comportamiento de la API | Log del servidor |
+|-----------|--------------------------|------------------|
+| Broker no disponible al iniciar | La app arranca igualmente; Kafka queda desconectado | `Kafka connect error` |
+| Fallo al publicar evento | La operación HTTP termina con éxito (201/200) | `Failed to send message to topic <topic>` |
+| Productor desconectado al emitir | Intenta reconectar automáticamente antes de enviar | `Kafka producer disconnected. Reconnecting...` |
+| Reconexión exitosa | El evento se publica normalmente | `Message sent to topic <topic>` |
+| Reconexión fallida | La operación HTTP sigue siendo exitosa; el evento no se publica | `Failed to send message to topic <topic>` |
+
+### Topics afectados
+
+| Topic | Origen | Impacto si falla la publicación |
+|-------|--------|----------------------------------|
+| `telemetry_received` | `SensorsService` tras guardar lectura | Dato en MongoDB; consumidores externos no reciben el evento |
+| `alert_generated` | `AlertsService` tras crear alerta | Alerta en MongoDB; consumidores externos no notificados |
+| `sensor_offline` | `SensorsService` al detectar sensor offline | Alerta creada; evento offline no distribuido |
+
+### Cómo diagnosticar
+
+```bash
+docker logs iot_backend 2>&1 | findstr /i "kafka"
+```
+
+En Linux/macOS:
+
+```bash
+docker logs iot_backend 2>&1 | grep -i kafka
+```
+
+Mensajes clave:
+
+- `Connected to Kafka broker kafka:9092` — conexión OK al arrancar
+- `Kafka connect error` — broker inaccesible al iniciar
+- `Failed to send message to topic` — publicación fallida (datos ya persistidos en MongoDB)
+
+### Variable de entorno
+
+```env
+KAFKA_BROKER=kafka:9092
+```
+
+Si el broker es incorrecto o inalcanzable, la API sigue operativa pero los eventos no se distribuyen hasta que Kafka esté disponible.
+
+---
+
 ## Estado del proyecto
 
 Proyecto académico en desarrollo activo.
@@ -410,7 +550,8 @@ Proyecto académico en desarrollo activo.
 - Persistencia en MongoDB
 - Generación automática de alertas por umbrales
 - Productor Kafka con publicación de eventos
-- Documentación Swagger
+- Documentación Swagger con respuestas de error por endpoint
+- Catálogo de errores API y Kafka en README
 - Contenerización con Docker Compose
 
 **Pendiente / en progreso:**
@@ -418,7 +559,7 @@ Proyecto académico en desarrollo activo.
 - Consumidores Kafka
 - Autenticación JWT (dependencias instaladas, módulo no implementado)
 - Deduplicación y resolución de alertas activas
-- Health check de Kafka
+- Health check de Kafka (incluir estado en `/health`)
 - Integración del endpoint `/events/test` con Kafka
 
 ---

@@ -54,3 +54,6 @@ pids
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Auditoría local (solo rama feature, no mergear a main)
+CodeAuditor.md

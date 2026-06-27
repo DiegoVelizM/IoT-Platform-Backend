@@ -283,7 +283,7 @@ Ejemplo de body:
 GET /health
 ```
 
-Verifica disponibilidad del backend y el estado de la conexión a MongoDB.
+Verifica disponibilidad del backend, MongoDB y Kafka. Ejecuta un **probe activo** contra el broker Kafka en cada consulta (no usa solo el último estado cacheado).
 
 ---
 
@@ -463,7 +463,7 @@ Todos los endpoints REST devuelven errores con el siguiente **formato estandariz
 
 **GET /health — MongoDB o Kafka desconectados:**
 
-Responde `200 OK` con `status: "degraded"`:
+Responde `200 OK` con `status: "degraded"`. Kafka se verifica en tiempo real con un probe activo (`listTopics`); si el broker está disponible, reconecta el productor automáticamente:
 
 ```json
 {

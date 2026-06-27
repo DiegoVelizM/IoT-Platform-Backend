@@ -29,6 +29,8 @@ export class KafkaProducerService implements OnModuleInit, OnModuleDestroy {
     this.kafka = new Kafka({
       brokers: [DEFAULT_BROKER],
       retry: { retries: 3 },
+      connectionTimeout: 5000,
+      requestTimeout: 5000,
     });
 
     this.producer = this.kafka.producer({
@@ -65,6 +67,38 @@ export class KafkaProducerService implements OnModuleInit, OnModuleDestroy {
       lastError: this.lastError,
       lastErrorCode: this.lastErrorCode,
     };
+  }
+
+  async probeHealth(): Promise<KafkaHealthStatus> {
+    const admin = this.kafka.admin();
+
+    try {
+      await admin.connect();
+      await admin.listTopics();
+      await admin.disconnect();
+
+      if (!this.isConnected) {
+        await this.connect();
+      } else {
+        this.lastError = undefined;
+        this.lastErrorCode = undefined;
+      }
+
+      return this.getHealthStatus();
+    } catch (err) {
+      this.isConnected = false;
+
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      this.registerError(ErrorCode.KAFKA_CONNECTION_FAILED, errorMessage);
+
+      try {
+        await admin.disconnect();
+      } catch {
+        // Ignorar error al cerrar cliente admin tras fallo de probe
+      }
+
+      return this.getHealthStatus();
+    }
   }
 
   async emit<T extends object>(

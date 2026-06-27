@@ -10,10 +10,10 @@ export class HealthService {
     private readonly kafkaProducer: KafkaProducerService,
   ) {}
 
-  getHealth() {
+  async getHealth() {
     const database =
       this.connection.readyState === 1 ? 'connected' : 'disconnected';
-    const kafka = this.kafkaProducer.getHealthStatus();
+    const kafka = await this.kafkaProducer.probeHealth();
 
     const isHealthy = database === 'connected' && kafka.connected;
 

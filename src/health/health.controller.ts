@@ -13,11 +13,12 @@ export class HealthController {
   @ApiOperation({
     summary: 'Verificar estado del backend, MongoDB y Kafka',
     description:
-      'Responde 200 con status `ok` o `degraded`. Revise los campos `database` y `kafka` para detectar dependencias caídas.',
+      'Responde 200 con status `ok` o `degraded`. Verifica MongoDB y ejecuta un probe activo contra Kafka ' +
+      '(listTopics + reconexión del productor si es necesario) para reflejar el estado en tiempo real.',
   })
   @ApiOkResponse({ type: HealthResponseDto })
   @ApiReadErrors()
-  getHealth() {
+  async getHealth() {
     return this.healthService.getHealth();
   }
 }

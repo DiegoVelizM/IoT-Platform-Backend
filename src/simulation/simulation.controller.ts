@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
-import { ApiBody, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ApiReadErrors, ApiWriteErrors } from '../common/decorators/api-standard-errors.decorator';
 import { SimulationService } from './simulation.service';
 import { StartSimulationDto } from './dto/start-simulation.dto';
 
@@ -10,6 +11,8 @@ export class SimulationController {
 
   @Get('sensors')
   @ApiOperation({ summary: 'Generar sensores simulados' })
+  @ApiOkResponse({ description: 'Lista de sensores médicos simulados predefinidos' })
+  @ApiReadErrors()
   @ApiQuery({
     name: 'quantity',
     required: false,
@@ -22,7 +25,13 @@ export class SimulationController {
   }
 
   @Post('start')
-  @ApiOperation({ summary: 'Iniciar simulación automática' })
+  @ApiOperation({
+    summary: 'Iniciar simulación automática',
+    description:
+      'Emite lecturas periódicas hacia el flujo de telemetría. Si ya hay una simulación activa, responde 200 con mensaje informativo.',
+  })
+  @ApiOkResponse({ description: 'Simulación iniciada o mensaje si ya estaba en ejecución' })
+  @ApiWriteErrors()
   @ApiBody({
     required: false,
     type: StartSimulationDto,
@@ -52,6 +61,8 @@ export class SimulationController {
 
   @Post('stop')
   @ApiOperation({ summary: 'Detener simulación automática' })
+  @ApiOkResponse({ description: 'Simulación detenida correctamente' })
+  @ApiReadErrors()
   stopSimulation() {
     return this.simulationService.stopSimulation();
   }

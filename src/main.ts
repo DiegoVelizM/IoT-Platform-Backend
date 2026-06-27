@@ -17,8 +17,12 @@ async function bootstrap() {
   );
 
   const config = new DocumentBuilder()
-    .setTitle('API Sensores Simulados')
-    .setDescription('API para recibir, almacenar y exponer datos de sensores simulados')
+    .setTitle('IoT Platform Backend API')
+    .setDescription(
+      'API para recibir, almacenar y exponer telemetría de sensores médicos simulados. ' +
+        'Incluye simulación automática, alertas por umbrales e integración con Kafka. ' +
+        'Consulte la sección de respuestas de error en cada endpoint y el README para el catálogo completo de errores API y Kafka.',
+    )
     .setVersion('1.0')
     .build();
 

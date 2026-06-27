@@ -35,11 +35,11 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
     healthcheck:
-      test: ["CMD", "bash", "-c", "echo ruok | nc localhost 2181 | grep imok"]
+      test: ["CMD", "bash", "-c", "echo srvr | nc localhost 2181 | grep -q Mode"]
       interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 10s
+      retries: 8
+      start_period: 30s
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0

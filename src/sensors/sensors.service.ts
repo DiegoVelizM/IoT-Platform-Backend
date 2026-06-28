@@ -9,6 +9,9 @@ import { KafkaProducerService } from '../kafka/kafka-producer.service';
 import { KAFKA_TOPICS } from '../kafka/kafka-topics.constants';
 import { EventType } from '../common/events/event-types';
 import { SENSOR_THRESHOLDS } from './constants/sensor-thresholds.constants';
+import { ResourceNotFoundException } from '../common/exceptions/resource-not-found.exception';
+import { OperationWarningDto } from '../common/dto/operation-warning.dto';
+import { KafkaPublishResult } from '../kafka/interfaces/kafka-publish-result.interface';
 
 @Injectable()
 export class SensorsService {
@@ -32,13 +35,19 @@ export class SensorsService {
         `Sensor reading saved for ${savedReading.sensorId}`,
       );
 
-      await this.publishTelemetryReceived(savedReading);
-      await this.generateAlertsFromTelemetry(createSensorReadingDto);
+      const kafkaResults: KafkaPublishResult[] = [];
+      const telemetryResult = await this.publishTelemetryReceived(savedReading);
+      kafkaResults.push(telemetryResult);
+
+      await this.generateAlertsFromTelemetry(
+        createSensorReadingDto,
+        kafkaResults,
+      );
       this.logger.log(
         `Telemetry processed successfully for sensor ${savedReading.sensorId}`,
       );
 
-      return savedReading;
+      return this.appendWarnings(savedReading.toObject(), kafkaResults);
     } catch (error) {
       this.logger.error(
         `Failed to process sensor reading for ${createSensorReadingDto.sensorId}`,
@@ -50,7 +59,7 @@ export class SensorsService {
   }
 
   private async publishTelemetryReceived(reading: SensorReading) {
-    await this.kafkaProducer.emit(KAFKA_TOPICS.TELEMETRY_RECEIVED, {
+    return this.kafkaProducer.emit(KAFKA_TOPICS.TELEMETRY_RECEIVED, {
       eventId: randomUUID(),
       eventType: EventType.TELEMETRY_RECEIVED,
       occurredAt: new Date(),
@@ -72,8 +81,11 @@ export class SensorsService {
     });
   }
 
-  private async generateAlertsFromTelemetry(data: CreateSensorReadingDto) {
-    await this.checkSensorOfflineAlert(data);
+  private async generateAlertsFromTelemetry(
+    data: CreateSensorReadingDto,
+    kafkaResults: KafkaPublishResult[],
+  ) {
+    await this.checkSensorOfflineAlert(data, kafkaResults);
 
     const alertChecks = [
       () => this.checkBatteryAlert(data),
@@ -107,7 +119,10 @@ export class SensorsService {
     });
   }
 
-  private async checkSensorOfflineAlert(data: CreateSensorReadingDto) {
+  private async checkSensorOfflineAlert(
+    data: CreateSensorReadingDto,
+    kafkaResults: KafkaPublishResult[],
+  ) {
     if (data.connectionStatus !== 'offline') {
       return;
     }
@@ -120,7 +135,9 @@ export class SensorsService {
       resolved: false,
     });
 
-    await this.kafkaProducer.emit(KAFKA_TOPICS.SENSOR_OFFLINE, {
+    const publishResult = await this.kafkaProducer.emit(
+      KAFKA_TOPICS.SENSOR_OFFLINE,
+      {
       eventId: randomUUID(),
       eventType: EventType.SENSOR_OFFLINE,
       occurredAt: new Date(),
@@ -129,7 +146,10 @@ export class SensorsService {
       assetId: data.assetId,
       sensorType: data.sensorType,
       connectionStatus: data.connectionStatus,
-    });
+    },
+    );
+
+    kafkaResults.push(publishResult);
   }
 
   private async checkColdChainTemperatureAlert(data: CreateSensorReadingDto) {
@@ -245,13 +265,49 @@ export class SensorsService {
   }
 
   async findLatest() {
-    return this.sensorReadingModel.findOne().sort({ createdAt: -1 }).exec();
+    const reading = await this.sensorReadingModel
+      .findOne()
+      .sort({ createdAt: -1 })
+      .exec();
+
+    if (!reading) {
+      throw new ResourceNotFoundException('Sensor readings', 'latest');
+    }
+
+    return reading;
   }
 
   async findBySensor(sensorId: string) {
-    return this.sensorReadingModel
+    const readings = await this.sensorReadingModel
       .find({ sensorId })
       .sort({ createdAt: -1 })
       .exec();
+
+    if (readings.length === 0) {
+      throw new ResourceNotFoundException('Sensor readings', sensorId);
+    }
+
+    return readings;
+  }
+
+  private appendWarnings<T extends object>(
+    data: T,
+    kafkaResults: KafkaPublishResult[],
+  ): T & { warnings?: OperationWarningDto[] } {
+    const warnings = kafkaResults
+      .filter((result) => !result.success)
+      .map((result) => ({
+        code: result.errorCode!,
+        message:
+          result.errorMessage ??
+          `Failed to publish event to topic ${result.topic}`,
+        topic: result.topic,
+      }));
+
+    if (warnings.length === 0) {
+      return data;
+    }
+
+    return { ...data, warnings };
   }
 }

@@ -1,6 +1,9 @@
 import { Controller, Get, Param } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { ApiReadErrors } from '../common/decorators/api-standard-errors.decorator';
+import {
+  ApiReadErrors,
+  ApiResourceReadErrors,
+} from '../common/decorators/api-standard-errors.decorator';
 import { SensorsService } from './sensors.service';
 
 @ApiTags('Sensors')
@@ -18,8 +21,8 @@ export class SensorsController {
 
     @Get('latest')
     @ApiOperation({ summary: 'Obtener última lectura registrada' })
-    @ApiOkResponse({ description: 'Última lectura registrada, o null si no hay datos' })
-    @ApiReadErrors()
+    @ApiOkResponse({ description: 'Última lectura registrada' })
+    @ApiResourceReadErrors()
     findLatest() {
         return this.sensorsService.findLatest();
     }
@@ -27,7 +30,7 @@ export class SensorsController {
     @Get('sensor/:sensorId')
     @ApiOperation({ summary: 'Obtener lecturas por sensor' })
     @ApiOkResponse({ description: 'Lecturas del sensor indicado' })
-    @ApiReadErrors()
+    @ApiResourceReadErrors()
     findBySensor(@Param('sensorId') sensorId: string) {
         return this.sensorsService.findBySensor(sensorId);
     }

@@ -2,9 +2,11 @@ import { applyDecorators } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiInternalServerErrorResponse,
+  ApiNotFoundResponse,
 } from '@nestjs/swagger';
 import {
-  HttpErrorResponseDto,
+  NotFoundErrorResponseDto,
+  StandardErrorResponseDto,
   ValidationErrorResponseDto,
 } from '../dto/error-response.dto';
 
@@ -18,7 +20,7 @@ export function ApiWriteErrors() {
     ApiInternalServerErrorResponse({
       description:
         'Error interno del servidor (por ejemplo, MongoDB no disponible o fallo al persistir datos)',
-      type: HttpErrorResponseDto,
+      type: StandardErrorResponseDto,
     }),
   );
 }
@@ -28,7 +30,17 @@ export function ApiReadErrors() {
     ApiInternalServerErrorResponse({
       description:
         'Error interno del servidor (por ejemplo, MongoDB no disponible)',
-      type: HttpErrorResponseDto,
+      type: StandardErrorResponseDto,
     }),
+  );
+}
+
+export function ApiResourceReadErrors() {
+  return applyDecorators(
+    ApiNotFoundResponse({
+      description: 'Recurso no encontrado para el identificador indicado',
+      type: NotFoundErrorResponseDto,
+    }),
+    ApiReadErrors(),
   );
 }

@@ -131,6 +131,7 @@ Payload enviado a P11 (formato camelCase plano dentro del envelope de P11):
 ```json
 {
   "sistema_id": "P08",
+  "creado_en": "2026-07-02T20:00:00.000Z",
   "payload": {
     "eventId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
     "eventType": "alert_generated",

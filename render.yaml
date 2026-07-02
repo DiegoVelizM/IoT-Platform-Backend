@@ -24,3 +24,5 @@ services:
         value: https://analisis-proyecto-ti.onrender.com/v1/events
       - key: ANALYTICS_EVENTS_ENABLED
         value: "true"
+      - key: SIMULATION_API_KEY
+        generateValue: true

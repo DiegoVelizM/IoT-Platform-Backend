@@ -73,6 +73,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
         return ErrorCode.VALIDATION_ERROR;
       case HttpStatus.NOT_FOUND:
         return ErrorCode.NOT_FOUND;
+      case HttpStatus.UNAUTHORIZED:
+        return ErrorCode.SIMULATION_UNAUTHORIZED;
       default:
         return ErrorCode.INTERNAL_ERROR;
     }

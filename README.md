@@ -215,11 +215,21 @@ Permiten consultar lecturas almacenadas en MongoDB.
 
 ```http
 GET  /simulation/sensors?quantity=4
-POST /simulation/start
-POST /simulation/stop
+POST /simulation/start   # requiere X-Simulation-Key
+POST /simulation/stop    # requiere X-Simulation-Key
 ```
 
 Permiten generar sensores simulados e iniciar/detener la emisión automática de lecturas periódicas.
+
+**Control de simulación (start/stop):** solo el equipo P08 o quien reciba la clave. En cada `POST /simulation/start` o `stop` enviar el header:
+
+```http
+X-Simulation-Key: <valor de SIMULATION_API_KEY en Render>
+```
+
+Sin clave válida → `401 Unauthorized`. Otros equipos (P01, P09) deben usar `GET /sensors/*` o `POST /telemetry` para probar la API.
+
+En local, definir `SIMULATION_API_KEY` en `.env`.
 
 Ejemplo — iniciar simulación con frecuencia global:
 

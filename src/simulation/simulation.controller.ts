@@ -1,8 +1,10 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBody, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { ApiReadErrors, ApiWriteErrors } from '../common/decorators/api-standard-errors.decorator';
 import { SimulationService } from './simulation.service';
 import { StartSimulationDto } from './dto/start-simulation.dto';
+import { SimulationApiKeyGuard } from './guards/simulation-api-key.guard';
+import { ApiSimulationKeyRequired } from './decorators/api-simulation-key.decorator';
 
 @ApiTags('Simulation')
 @Controller('simulation')
@@ -25,10 +27,12 @@ export class SimulationController {
   }
 
   @Post('start')
+  @UseGuards(SimulationApiKeyGuard)
+  @ApiSimulationKeyRequired()
   @ApiOperation({
     summary: 'Iniciar simulación automática',
     description:
-      'Emite lecturas periódicas hacia el flujo de telemetría. Si ya hay una simulación activa, responde 200 con mensaje informativo.',
+      'Emite lecturas periódicas hacia el flujo de telemetría. Requiere header X-Simulation-Key (solo equipo P08 o terceros autorizados). Si ya hay una simulación activa, responde 200 con mensaje informativo.',
   })
   @ApiOkResponse({ description: 'Simulación iniciada o mensaje si ya estaba en ejecución' })
   @ApiWriteErrors()
@@ -60,6 +64,8 @@ export class SimulationController {
   }
 
   @Post('stop')
+  @UseGuards(SimulationApiKeyGuard)
+  @ApiSimulationKeyRequired()
   @ApiOperation({ summary: 'Detener simulación automática' })
   @ApiOkResponse({ description: 'Simulación detenida correctamente' })
   @ApiReadErrors()

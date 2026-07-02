@@ -9,6 +9,13 @@ class KafkaHealthDto {
   broker!: string;
 
   @ApiPropertyOptional({
+    example: 'cloud',
+    enum: ['local', 'cloud'],
+    description: 'local = Docker Compose; cloud = Confluent Cloud (SASL/SSL)',
+  })
+  mode?: 'local' | 'cloud';
+
+  @ApiPropertyOptional({
     example: 'Connection refused',
     description: 'Último error registrado del productor Kafka',
   })

@@ -10,12 +10,13 @@ import {
   KafkaHealthStatus,
   KafkaPublishResult,
 } from './interfaces/kafka-publish-result.interface';
-
-const DEFAULT_BROKER = process.env.KAFKA_BROKER || 'kafka:9092';
+import { resolveKafkaConfig } from './kafka.config';
+import { KAFKA_TOPICS } from './kafka-topics.constants';
 
 @Injectable()
 export class KafkaProducerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(KafkaProducerService.name);
+  private readonly kafkaSettings = resolveKafkaConfig();
 
   private kafka: Kafka;
   private producer: Producer;
@@ -26,12 +27,7 @@ export class KafkaProducerService implements OnModuleInit, OnModuleDestroy {
     | ErrorCode.KAFKA_PUBLISH_FAILED;
 
   constructor() {
-    this.kafka = new Kafka({
-      brokers: [DEFAULT_BROKER],
-      retry: { retries: 3 },
-      connectionTimeout: 5000,
-      requestTimeout: 5000,
-    });
+    this.kafka = new Kafka(this.kafkaSettings.kafkaConfig);
 
     this.producer = this.kafka.producer({
       maxInFlightRequests: 1,
@@ -41,6 +37,7 @@ export class KafkaProducerService implements OnModuleInit, OnModuleDestroy {
   async onModuleInit() {
     try {
       await this.connect();
+      await this.ensureTopics();
     } catch {
       this.logger.warn(
         'Kafka unavailable at startup. API will continue without event publishing.',
@@ -63,7 +60,8 @@ export class KafkaProducerService implements OnModuleInit, OnModuleDestroy {
   getHealthStatus(): KafkaHealthStatus {
     return {
       connected: this.isConnected,
-      broker: DEFAULT_BROKER,
+      broker: this.kafkaSettings.brokers[0],
+      mode: this.kafkaSettings.mode,
       lastError: this.lastError,
       lastErrorCode: this.lastErrorCode,
     };
@@ -157,7 +155,9 @@ export class KafkaProducerService implements OnModuleInit, OnModuleDestroy {
       this.lastError = undefined;
       this.lastErrorCode = undefined;
 
-      this.logger.log(`Connected to Kafka broker ${DEFAULT_BROKER}`);
+      this.logger.log(
+        `Connected to Kafka (${this.kafkaSettings.mode}) at ${this.kafkaSettings.brokers[0]}`,
+      );
     } catch (err) {
       this.isConnected = false;
 
@@ -171,6 +171,37 @@ export class KafkaProducerService implements OnModuleInit, OnModuleDestroy {
       );
 
       throw err;
+    }
+  }
+
+  private async ensureTopics(): Promise<void> {
+    const topics = Object.values(KAFKA_TOPICS);
+    const admin = this.kafka.admin();
+
+    try {
+      await admin.connect();
+
+      await admin.createTopics({
+        topics: topics.map((topic) => ({
+          topic,
+          numPartitions: 1,
+          replicationFactor: 1,
+        })),
+        waitForLeaders: true,
+      });
+
+      this.logger.log(`Kafka topics ensured: ${topics.join(', ')}`);
+    } catch (err) {
+      this.logger.warn(
+        'Could not ensure Kafka topics',
+        err instanceof Error ? err.message : String(err),
+      );
+    } finally {
+      try {
+        await admin.disconnect();
+      } catch {
+        // Ignorar error al cerrar admin tras ensureTopics
+      }
     }
   }
 

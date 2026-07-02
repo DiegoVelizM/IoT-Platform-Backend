@@ -10,6 +10,7 @@ export interface KafkaPublishResult {
 export interface KafkaHealthStatus {
   connected: boolean;
   broker: string;
+  mode?: 'local' | 'cloud';
   lastError?: string;
   lastErrorCode?: ErrorCode.KAFKA_CONNECTION_FAILED | ErrorCode.KAFKA_PUBLISH_FAILED;
 }

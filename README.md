@@ -75,6 +75,25 @@ KAFKA_BROKER=kafka:9092
 JWT_SECRET=super_secret_key
 ```
 
+**Kafka local (Docker):** solo `KAFKA_BROKER=kafka:9092` — sin usuario ni contraseña.
+
+**Kafka en la nube (Render + Confluent Cloud):** además del broker, configurar credenciales SASL/SSL:
+
+```env
+KAFKA_BROKER=pkc-xxxxx.us-west-2.aws.confluent.cloud:9092
+KAFKA_USERNAME=tu_api_key
+KAFKA_PASSWORD=tu_api_secret
+KAFKA_SASL_MECHANISM=plain
+```
+
+| Proveedor | Estado | Notas |
+|-----------|--------|-------|
+| **Confluent Cloud** | ✅ Recomendado | Trial ~$400 / 30 días; cluster Basic; `KAFKA_SASL_MECHANISM=plain` |
+| **Upstash Kafka** | ❌ Descontinuado (2024–2025) | Ya no acepta usuarios nuevos |
+| **Docker local** | ✅ Para demo en clase | `KAFKA_BROKER=kafka:9092` sin credenciales |
+
+Los topics `telemetry_received`, `alert_generated` y `sensor_offline` se crean automáticamente al arrancar si no existen.
+
 > `JWT_SECRET` está preparado para futura autenticación; actualmente no se utiliza.
 
 ### 4. Crear volumen de MongoDB (solo Docker)

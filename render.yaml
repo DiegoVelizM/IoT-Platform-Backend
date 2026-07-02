@@ -1,0 +1,20 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+# Requiere MongoDB Atlas (MONGODB_URI). Kafka es opcional; sin broker la API sigue operativa.
+services:
+  - type: web
+    name: iot-platform-backend
+    runtime: docker
+    plan: free
+    region: oregon
+    healthCheckPath: /
+    envVars:
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: KAFKA_BROKER
+        sync: false
+      - key: ANALYTICS_EVENTS_URL
+        value: https://analisis-proyecto-ti.onrender.com/v1/events
+      - key: ANALYTICS_EVENTS_ENABLED
+        value: "true"

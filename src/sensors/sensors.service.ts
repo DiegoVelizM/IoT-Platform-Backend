@@ -12,6 +12,8 @@ import { SENSOR_THRESHOLDS } from './constants/sensor-thresholds.constants';
 import { ResourceNotFoundException } from '../common/exceptions/resource-not-found.exception';
 import { OperationWarningDto } from '../common/dto/operation-warning.dto';
 import { KafkaPublishResult } from '../kafka/interfaces/kafka-publish-result.interface';
+import { AnalyticsEventsService } from '../analytics/analytics-events.service';
+import { AnalyticsAlertContext } from '../analytics/interfaces/analytics-alert-context.interface';
 
 @Injectable()
 export class SensorsService {
@@ -21,6 +23,7 @@ export class SensorsService {
     private sensorReadingModel: Model<SensorReading>,
     private readonly alertsService: AlertsService,
     private readonly kafkaProducer: KafkaProducerService,
+    private readonly analyticsEventsService: AnalyticsEventsService,
   ) {}
 
   async create(createSensorReadingDto: CreateSensorReadingDto) {
@@ -38,6 +41,7 @@ export class SensorsService {
       const kafkaResults: KafkaPublishResult[] = [];
       const telemetryResult = await this.publishTelemetryReceived(savedReading);
       kafkaResults.push(telemetryResult);
+      this.analyticsEventsService.publishTelemetry(savedReading);
 
       await this.generateAlertsFromTelemetry(
         createSensorReadingDto,
@@ -107,7 +111,8 @@ export class SensorsService {
       return;
     }
 
-    await this.alertsService.create({
+    await this.alertsService.create(
+      {
       sensorId: data.sensorId,
       type: 'low_battery',
       severity:
@@ -116,7 +121,9 @@ export class SensorsService {
           : 'warning',
       message: `Battery level is low: ${data.batteryLevel}%`,
       resolved: false,
-    });
+    },
+      this.buildAnalyticsContext(data, 'low_battery'),
+    );
   }
 
   private async checkSensorOfflineAlert(
@@ -127,13 +134,16 @@ export class SensorsService {
       return;
     }
 
-    await this.alertsService.create({
+    await this.alertsService.create(
+      {
       sensorId: data.sensorId,
       type: 'sensor_offline',
       severity: 'critical',
       message: 'Sensor is offline',
       resolved: false,
-    });
+    },
+      this.buildAnalyticsContext(data, 'sensor_offline'),
+    );
 
     const publishResult = await this.kafkaProducer.emit(
       KAFKA_TOPICS.SENSOR_OFFLINE,
@@ -161,13 +171,16 @@ export class SensorsService {
       return;
     }
 
-    await this.alertsService.create({
+    await this.alertsService.create(
+      {
       sensorId: data.sensorId,
       type: 'temperature_out_of_range',
       severity: 'warning',
       message: `Temperature out of range: ${data.temperature}°C`,
       resolved: false,
-    });
+    },
+      this.buildAnalyticsContext(data, 'temperature_out_of_range'),
+    );
   }
 
   private async checkGlucoseAlert(data: CreateSensorReadingDto) {
@@ -179,7 +192,8 @@ export class SensorsService {
       return;
     }
 
-    await this.alertsService.create({
+    await this.alertsService.create(
+      {
       sensorId: data.sensorId,
       type: 'glucose_out_of_range',
       severity:
@@ -189,7 +203,9 @@ export class SensorsService {
           : 'warning',
       message: `Glucose level out of range: ${data.glucoseLevel}`,
       resolved: false,
-    });
+    },
+      this.buildAnalyticsContext(data, 'glucose_out_of_range'),
+    );
   }
 
   private async checkOxygenSaturationAlert(data: CreateSensorReadingDto) {
@@ -200,7 +216,8 @@ export class SensorsService {
       return;
     }
 
-    await this.alertsService.create({
+    await this.alertsService.create(
+      {
       sensorId: data.sensorId,
       type: 'oxygen_saturation_low',
       severity:
@@ -209,7 +226,9 @@ export class SensorsService {
           : 'warning',
       message: `Low oxygen saturation: ${data.oxygenSaturation}%`,
       resolved: false,
-    });
+    },
+      this.buildAnalyticsContext(data, 'oxygen_saturation_low'),
+    );
   }
 
   private async checkHeartRateAlert(data: CreateSensorReadingDto) {
@@ -221,7 +240,8 @@ export class SensorsService {
       return;
     }
 
-    await this.alertsService.create({
+    await this.alertsService.create(
+      {
       sensorId: data.sensorId,
       type: 'heart_rate_out_of_range',
       severity:
@@ -231,7 +251,9 @@ export class SensorsService {
           : 'warning',
       message: `Heart rate out of range: ${data.heartRate} bpm`,
       resolved: false,
-    });
+    },
+      this.buildAnalyticsContext(data, 'heart_rate_out_of_range'),
+    );
   }
 
   private async checkBloodPressureAlert(data: CreateSensorReadingDto) {
@@ -245,7 +267,8 @@ export class SensorsService {
       return;
     }
 
-    await this.alertsService.create({
+    await this.alertsService.create(
+      {
       sensorId: data.sensorId,
       type: 'blood_pressure_high',
       severity:
@@ -257,7 +280,42 @@ export class SensorsService {
           : 'warning',
       message: `Blood pressure elevated: ${data.systolicPressure}/${data.diastolicPressure}`,
       resolved: false,
-    });
+    },
+      this.buildAnalyticsContext(data, 'blood_pressure_high'),
+    );
+  }
+
+  private buildAnalyticsContext(
+    data: CreateSensorReadingDto,
+    alertType: string,
+  ): AnalyticsAlertContext {
+    return {
+      assetId: data.assetId,
+      sensorType: data.sensorType,
+      batteryLevel: data.batteryLevel,
+      connectionStatus: data.connectionStatus,
+      currentValue: this.extractCurrentValue(data, alertType),
+    };
+  }
+
+  private extractCurrentValue(
+    data: CreateSensorReadingDto,
+    alertType: string,
+  ): number | undefined {
+    switch (alertType) {
+      case 'temperature_out_of_range':
+        return data.temperature;
+      case 'glucose_out_of_range':
+        return data.glucoseLevel;
+      case 'oxygen_saturation_low':
+        return data.oxygenSaturation;
+      case 'heart_rate_out_of_range':
+        return data.heartRate;
+      case 'blood_pressure_high':
+        return data.systolicPressure;
+      default:
+        return undefined;
+    }
   }
 
   async findAll() {

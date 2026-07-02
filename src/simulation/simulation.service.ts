@@ -7,6 +7,7 @@ import {
 } from 'src/sensors/dto/create-sensor-reading.dto';
 import { SimulatedSensor } from './interfaces/simulated-sensor.interface';
 import { StartSimulationDto } from './dto/start-simulation.dto';
+import { SENSOR_THRESHOLDS } from '../sensors/constants/sensor-thresholds.constants';
 
 @Injectable()
 export class SimulationService {
@@ -14,6 +15,9 @@ export class SimulationService {
   private intervalIds: NodeJS.Timeout[] = [];
 
   private readonly EMIT_INTERVAL_MS = 5000;
+  private readonly DEFAULT_OFFLINE_PROBABILITY = 0.05;
+  private readonly MAX_OFFLINE_PROBABILITY = 0.25;
+  private readonly offlineProbability = this.resolveOfflineProbability();
 
   constructor(private readonly sensorsService: SensorsService) {}
 
@@ -69,14 +73,18 @@ export class SimulationService {
 
   private async generateAndSendReading(sensorId: string): Promise<void> {
     const sensorType = this.getMedicalSensorTypeFromId(sensorId);
+    const batteryLevel = this.getRandomBatteryLevel();
+    const isOffline = this.shouldSimulateOffline(batteryLevel);
 
     const reading: CreateSensorReadingDto = {
       sensorId,
       assetId: this.getAssetIdFromSensor(sensorId),
       sensorType,
-      batteryLevel: +(20 + Math.random() * 80).toFixed(2),
-      connectionStatus: ConnectionStatus.CONNECTED,
-      ...this.generateMedicalValues(sensorType),
+      batteryLevel,
+      connectionStatus: isOffline
+        ? ConnectionStatus.OFFLINE
+        : ConnectionStatus.CONNECTED,
+      ...(isOffline ? {} : this.generateMedicalValues(sensorType)),
     };
 
     try {
@@ -179,6 +187,28 @@ export class SimulationService {
   }
 
   private getRandomBatteryLevel(): number {
-    return Math.floor(20 + Math.random() * 81);
+    return Math.floor(5 + Math.random() * 96);
+  }
+
+  private shouldSimulateOffline(batteryLevel: number): boolean {
+    let probability = this.offlineProbability;
+
+    if (batteryLevel < SENSOR_THRESHOLDS.BATTERY.CRITICAL) {
+      probability += 0.1;
+    } else if (batteryLevel < SENSOR_THRESHOLDS.BATTERY.LOW) {
+      probability += 0.05;
+    }
+
+    return Math.random() < Math.min(probability, this.MAX_OFFLINE_PROBABILITY);
+  }
+
+  private resolveOfflineProbability(): number {
+    const configuredValue = Number(process.env.SIMULATION_OFFLINE_PROBABILITY);
+
+    if (!Number.isFinite(configuredValue)) {
+      return this.DEFAULT_OFFLINE_PROBABILITY;
+    }
+
+    return Math.min(Math.max(configuredValue, 0), this.MAX_OFFLINE_PROBABILITY);
   }
 }

@@ -10,6 +10,8 @@ import { EventType } from '../common/events/event-types';
 import { ResourceNotFoundException } from '../common/exceptions/resource-not-found.exception';
 import { OperationWarningDto } from '../common/dto/operation-warning.dto';
 import { KafkaPublishResult } from '../kafka/interfaces/kafka-publish-result.interface';
+import { AnalyticsEventsService } from '../analytics/analytics-events.service';
+import { AnalyticsAlertContext } from '../analytics/interfaces/analytics-alert-context.interface';
 
 @Injectable()
 export class AlertsService {
@@ -19,9 +21,13 @@ export class AlertsService {
     @InjectModel(Alert.name)
     private alertModel: Model<Alert>,
     private readonly kafkaProducer: KafkaProducerService,
+    private readonly analyticsEventsService: AnalyticsEventsService,
   ) {}
 
-  async create(createAlertDto: CreateAlertDto) {
+  async create(
+    createAlertDto: CreateAlertDto,
+    analyticsContext?: AnalyticsAlertContext,
+  ) {
     try {
       const alert = new this.alertModel(createAlertDto);
       const savedAlert = await alert.save();
@@ -43,6 +49,10 @@ export class AlertsService {
       this.logger.log(
         `Alert generated: ${savedAlert.type} for sensor ${savedAlert.sensorId}`,
       );
+
+      if (analyticsContext) {
+        this.analyticsEventsService.publishAlert(savedAlert, analyticsContext);
+      }
 
       return this.appendWarnings(savedAlert.toObject(), [publishResult]);
     } catch (error) {

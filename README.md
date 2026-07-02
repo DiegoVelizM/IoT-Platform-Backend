@@ -94,6 +94,20 @@ KAFKA_SASL_MECHANISM=plain
 
 Los topics `telemetry_received`, `alert_generated` y `sensor_offline` se crean automáticamente al arrancar si no existen.
 
+**Integración con analítica (Proyecto 09):** el backend reenvía telemetría y alertas vía HTTP. Se configura por variables de entorno (sin URLs hardcodeadas):
+
+```env
+ANALYTICS_EVENTS_URL=https://analisis-proyecto-ti.onrender.com/v1/events
+ANALYTICS_EVENTS_ENABLED=true
+ANALYTICS_EVENTS_SOURCE=iot_devices
+```
+
+| Variable | Efecto |
+|----------|--------|
+| `ANALYTICS_EVENTS_URL` | Endpoint de P09. **Si no está definida, la integración queda deshabilitada** (se registra un warning al arrancar) |
+| `ANALYTICS_EVENTS_ENABLED` | `false` desactiva el envío aunque haya URL |
+| `ANALYTICS_EVENTS_SOURCE` | Campo `source` del envelope (default `iot_devices`) |
+
 > `JWT_SECRET` está preparado para futura autenticación; actualmente no se utiliza.
 
 ### 4. Crear volumen de MongoDB (solo Docker)

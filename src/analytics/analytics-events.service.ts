@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Alert } from '../alerts/schemas/alert.schema';
 import { SensorReading } from '../sensors/schemas/sensor-reading.schema';
 import { ErrorCode } from '../common/errors/error-codes';
@@ -9,28 +9,56 @@ import {
 import { AnalyticsAlertContext } from './interfaces/analytics-alert-context.interface';
 import { AnalyticsPublishResult } from './interfaces/analytics-publish-result.interface';
 
-const DEFAULT_EVENTS_URL =
-  'https://analisis-proyecto-ti.onrender.com/v1/events';
+const DEFAULT_SOURCE = 'iot_devices';
 
 @Injectable()
-export class AnalyticsEventsService {
+export class AnalyticsEventsService implements OnModuleInit {
   private readonly logger = new Logger(AnalyticsEventsService.name);
-  private readonly enabled =
-    process.env.ANALYTICS_EVENTS_ENABLED !== 'false';
-  private readonly eventsUrl =
-    process.env.ANALYTICS_EVENTS_URL ?? DEFAULT_EVENTS_URL;
+  private readonly explicitlyDisabled =
+    process.env.ANALYTICS_EVENTS_ENABLED === 'false';
+  private readonly eventsUrl = process.env.ANALYTICS_EVENTS_URL?.trim();
   private readonly source =
-    process.env.ANALYTICS_EVENTS_SOURCE ?? 'iot_devices';
+    process.env.ANALYTICS_EVENTS_SOURCE?.trim() || DEFAULT_SOURCE;
+
+  private get enabled(): boolean {
+    return !this.explicitlyDisabled && Boolean(this.eventsUrl);
+  }
+
+  onModuleInit(): void {
+    if (this.explicitlyDisabled) {
+      this.logger.log(
+        'Analytics integration disabled via ANALYTICS_EVENTS_ENABLED=false',
+      );
+      return;
+    }
+
+    if (!this.eventsUrl) {
+      this.logger.warn(
+        'Analytics integration disabled: ANALYTICS_EVENTS_URL is not configured',
+      );
+      return;
+    }
+
+    this.logger.log(`Analytics integration enabled → ${this.eventsUrl}`);
+  }
 
   publishTelemetry(
     reading: SensorReading & { createdAt?: Date },
   ): void {
+    if (!this.enabled) {
+      return;
+    }
+
     const envelope = mapTelemetryReceivedEvent(reading, this.source);
 
     void this.sendEnvelope(envelope);
   }
 
   publishAlert(alert: Alert, context: AnalyticsAlertContext): void {
+    if (!this.enabled) {
+      return;
+    }
+
     const envelope = mapAlertToAnalyticsEvent(alert, context, this.source);
 
     if (!envelope) {
@@ -48,7 +76,7 @@ export class AnalyticsEventsService {
     event_type: string;
     payload: Record<string, unknown>;
   }): Promise<AnalyticsPublishResult> {
-    if (!this.enabled) {
+    if (!this.enabled || !this.eventsUrl) {
       return { success: true, skipped: true, eventType: envelope.event_type };
     }
 

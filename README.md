@@ -112,7 +112,8 @@ ANALYTICS_EVENTS_SOURCE=iot_devices
 
 ```env
 INCIDENTS_ALERTS_URL=https://proyecto11-mochicode.onrender.com/api/v1/alertas
-INCIDENTS_JWT_TOKEN=<token JWT emitido por P12>
+INCIDENTS_API_KEY=<api key Zero Trust entregada por P11>
+INCIDENTS_JWT_TOKEN=<token JWT emitido por P12, cuando este disponible>
 INCIDENTS_SYSTEM_ID=P08
 INCIDENTS_ALERTS_ENABLED=true
 ```
@@ -120,7 +121,8 @@ INCIDENTS_ALERTS_ENABLED=true
 | Variable | Efecto |
 |----------|--------|
 | `INCIDENTS_ALERTS_URL` | Endpoint de P11 (`POST /api/v1/alertas`). **Si no está definida, la integración queda deshabilitada** |
-| `INCIDENTS_JWT_TOKEN` | Bearer token para autenticación (requerido por P11 cuando esté activo) |
+| `INCIDENTS_API_KEY` | API Key Zero Trust de P11. Se envía en el header `x-api-key` |
+| `INCIDENTS_JWT_TOKEN` | Bearer token para autenticación futura con P12, si P11 lo habilita |
 | `INCIDENTS_SYSTEM_ID` | Identificador del sistema emisor (default `P08`) |
 | `INCIDENTS_ALERTS_ENABLED` | `false` desactiva el envío aunque haya URL |
 

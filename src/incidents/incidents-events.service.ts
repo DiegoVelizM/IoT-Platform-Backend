@@ -18,6 +18,7 @@ export class IncidentsEventsService implements OnModuleInit {
   private readonly alertsUrl = process.env.INCIDENTS_ALERTS_URL?.trim();
   private readonly systemId =
     process.env.INCIDENTS_SYSTEM_ID?.trim() || DEFAULT_SYSTEM_ID;
+  private readonly apiKey = process.env.INCIDENTS_API_KEY?.trim();
   private readonly jwtToken = process.env.INCIDENTS_JWT_TOKEN?.trim();
 
   private get enabled(): boolean {
@@ -37,6 +38,12 @@ export class IncidentsEventsService implements OnModuleInit {
         'Incidents integration disabled: INCIDENTS_ALERTS_URL is not configured',
       );
       return;
+    }
+
+    if (!this.apiKey) {
+      this.logger.warn(
+        'Incidents integration enabled without INCIDENTS_API_KEY; P11 may reject requests with 401',
+      );
     }
 
     this.logger.log(`Incidents integration enabled → ${this.alertsUrl}`);
@@ -69,6 +76,10 @@ export class IncidentsEventsService implements OnModuleInit {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
+
+    if (this.apiKey) {
+      headers['x-api-key'] = this.apiKey;
+    }
 
     if (this.jwtToken) {
       headers.Authorization = `Bearer ${this.jwtToken}`;

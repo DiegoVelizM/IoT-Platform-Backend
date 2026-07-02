@@ -20,7 +20,7 @@ export class AlertsController {
   @ApiOperation({
     summary: 'Crear alerta',
     description:
-      'Persiste la alerta en MongoDB y publica el evento `alert_generated` en Kafka. ' +
+      'Persiste la alerta en MongoDB, publica el evento `alert_generated` en Kafka y reenvía la alerta a P11 (incidentes) si `INCIDENTS_ALERTS_URL` está configurada. ' +
       'Si Kafka falla, la alerta se guarda y la respuesta incluye `warnings` con código `KAFKA_PUBLISH_FAILED`.',
   })
   @ApiCreatedResponse({

@@ -12,6 +12,7 @@ import { OperationWarningDto } from '../common/dto/operation-warning.dto';
 import { KafkaPublishResult } from '../kafka/interfaces/kafka-publish-result.interface';
 import { AnalyticsEventsService } from '../analytics/analytics-events.service';
 import { AnalyticsAlertContext } from '../analytics/interfaces/analytics-alert-context.interface';
+import { IncidentsEventsService } from '../incidents/incidents-events.service';
 
 @Injectable()
 export class AlertsService {
@@ -22,6 +23,7 @@ export class AlertsService {
     private alertModel: Model<Alert>,
     private readonly kafkaProducer: KafkaProducerService,
     private readonly analyticsEventsService: AnalyticsEventsService,
+    private readonly incidentsEventsService: IncidentsEventsService,
   ) {}
 
   async create(
@@ -53,6 +55,8 @@ export class AlertsService {
       if (analyticsContext) {
         this.analyticsEventsService.publishAlert(savedAlert, analyticsContext);
       }
+
+      this.incidentsEventsService.publishAlert(savedAlert, analyticsContext);
 
       return this.appendWarnings(savedAlert.toObject(), [publishResult]);
     } catch (error) {

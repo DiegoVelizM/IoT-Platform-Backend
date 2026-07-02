@@ -11,6 +11,7 @@ import { AlertsModule } from './alerts/alerts.module';
 import { SimulationModule } from './simulation/simulation.module';
 import { KafkaModule } from './kafka/kafka.module';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { IncidentsModule } from './incidents/incidents.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
     AlertsModule,
     KafkaModule,
     AnalyticsModule,
+    IncidentsModule,
     SimulationModule,
   ],
   controllers: [AppController],

@@ -28,6 +28,8 @@ services:
         generateValue: true
       - key: INCIDENTS_ALERTS_URL
         value: https://proyecto11-mochicode.onrender.com/api/v1/alertas
+      - key: INCIDENTS_API_KEY
+        sync: false
       - key: INCIDENTS_JWT_TOKEN
         sync: false
       - key: INCIDENTS_SYSTEM_ID

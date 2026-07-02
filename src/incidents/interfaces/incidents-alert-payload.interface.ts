@@ -12,5 +12,6 @@ export interface IncidentsAlertPayload {
 
 export interface IncidentsAlertEnvelope {
   sistema_id: string;
+  creado_en: string;
   payload: IncidentsAlertPayload;
 }

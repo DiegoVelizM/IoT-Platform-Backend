@@ -27,8 +27,11 @@ export function mapAlertToIncidentsEnvelope(
     payload.assetId = context.assetId;
   }
 
+  const creadoEn = (alert.occurredAt ?? new Date()).toISOString();
+
   return {
     sistema_id: systemId,
+    creado_en: creadoEn,
     payload,
   };
 }

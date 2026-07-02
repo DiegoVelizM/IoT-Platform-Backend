@@ -108,6 +108,43 @@ ANALYTICS_EVENTS_SOURCE=iot_devices
 | `ANALYTICS_EVENTS_ENABLED` | `false` desactiva el envío aunque haya URL |
 | `ANALYTICS_EVENTS_SOURCE` | Campo `source` del envelope (default `iot_devices`) |
 
+**Integración con incidentes (Proyecto 11):** al generar una alerta, el backend envía un `POST` al endpoint de ingesta de P11:
+
+```env
+INCIDENTS_ALERTS_URL=https://proyecto11-mochicode.onrender.com/api/v1/alertas
+INCIDENTS_JWT_TOKEN=<token JWT emitido por P12>
+INCIDENTS_SYSTEM_ID=P08
+INCIDENTS_ALERTS_ENABLED=true
+```
+
+| Variable | Efecto |
+|----------|--------|
+| `INCIDENTS_ALERTS_URL` | Endpoint de P11 (`POST /api/v1/alertas`). **Si no está definida, la integración queda deshabilitada** |
+| `INCIDENTS_JWT_TOKEN` | Bearer token para autenticación (requerido por P11 cuando esté activo) |
+| `INCIDENTS_SYSTEM_ID` | Identificador del sistema emisor (default `P08`) |
+| `INCIDENTS_ALERTS_ENABLED` | `false` desactiva el envío aunque haya URL |
+
+Payload enviado a P11 (formato camelCase plano dentro del envelope de P11):
+
+```json
+{
+  "sistema_id": "P08",
+  "payload": {
+    "eventId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "eventType": "alert_generated",
+    "occurredAt": "2026-07-02T20:00:00.000Z",
+    "source": "iot-platform",
+    "sensorId": "THERMO-001",
+    "assetId": "MEDKIT-001",
+    "alertType": "temperature_out_of_range",
+    "severity": "warning",
+    "message": "Temperature out of range: 12°C"
+  }
+}
+```
+
+> P11 exige `sistema_id` en la raíz; el evento va dentro de `payload`. También aceptan el formato snake_case anidado de P09, pero usamos camelCase plano por alineación con Kafka interno.
+
 > `JWT_SECRET` está preparado para futura autenticación; actualmente no se utiliza.
 
 ### 4. Crear volumen de MongoDB (solo Docker)

@@ -245,10 +245,10 @@ Sin clave válida → `401 Unauthorized`. Otros equipos (P01, P09) deben usar `G
 
 En local, definir `SIMULATION_API_KEY` en `.env`.
 
-La simulación genera fallos `sensor_offline` con baja probabilidad para ejercitar el topic Kafka `sensor_offline` y las alertas críticas. Por defecto usa 5% (`0.05`) y aumenta levemente cuando la batería simulada está baja o crítica.
+La simulación genera fallos `sensor_offline` con baja probabilidad para ejercitar el topic Kafka `sensor_offline` y las alertas críticas. Por defecto usa 2% (`0.02`) y aumenta levemente cuando la batería simulada está baja o crítica.
 
 ```env
-SIMULATION_OFFLINE_PROBABILITY=0.05
+SIMULATION_OFFLINE_PROBABILITY=0.02
 ```
 
 Usar `0` si se desea desactivar eventos offline en una demo específica. El valor máximo efectivo es `0.25`.

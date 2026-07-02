@@ -15,7 +15,7 @@ export class SimulationService {
   private intervalIds: NodeJS.Timeout[] = [];
 
   private readonly EMIT_INTERVAL_MS = 5000;
-  private readonly DEFAULT_OFFLINE_PROBABILITY = 0.05;
+  private readonly DEFAULT_OFFLINE_PROBABILITY = 0.02;
   private readonly MAX_OFFLINE_PROBABILITY = 0.25;
   private readonly offlineProbability = this.resolveOfflineProbability();
 

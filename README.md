@@ -73,7 +73,10 @@ PORT=3000
 MONGODB_URI=mongodb://mongo:27017/sensores_db
 KAFKA_BROKER=kafka:9092
 JWT_SECRET=super_secret_key
+READINGS_TTL_DAYS=7
 ```
+
+**Retención de lecturas (MongoDB TTL):** por defecto las lecturas en `sensorreadings` expiran a los **7 días** (`createdAt`). MongoDB las elimina en background. `READINGS_TTL_DAYS=0` desactiva el TTL (útil en pruebas de escala). No afecta alertas ni lo que P09 almacene por su cuenta.
 
 **Kafka local (Docker):** solo `KAFKA_BROKER=kafka:9092` — sin usuario ni contraseña.
 
@@ -775,7 +778,7 @@ Proyecto académico en desarrollo activo. Documentación detallada del equipo: [
 
 - Consumidor Kafka (`docs/KAFKA-CONSUMER.md` — otro compañero)
 - Evidencia documentada de prueba 1.000 sensores (Mongo + consumer)
-- Retención y agregación de datos (requisito del enunciado)
+- Retención y agregación de datos (requisito del enunciado) — **TTL lecturas 7 días** implementado; agregación mínima pendiente
 - Integración P06 notificaciones (otro compañero)
 - Confirmación de P01 sobre contrato de telemetría
 - Deduplicación y resolución de alertas activas

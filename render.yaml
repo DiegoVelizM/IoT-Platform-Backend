@@ -34,5 +34,7 @@ services:
         sync: false
       - key: INCIDENTS_SYSTEM_ID
         value: P08
+      - key: INCIDENTS_MIN_SEVERITY
+        value: critical
       - key: INCIDENTS_ALERTS_ENABLED
         value: "true"

@@ -6,6 +6,7 @@ import { mapAlertToIncidentsEnvelope } from './incidents-alert.mapper';
 import { IncidentsPublishResult } from './interfaces/incidents-publish-result.interface';
 
 const DEFAULT_SYSTEM_ID = 'P08';
+const DEFAULT_MIN_SEVERITY = 'critical';
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 500;
 const RETRYABLE_STATUS_CODES = new Set([429, 502, 503]);
@@ -20,6 +21,10 @@ export class IncidentsEventsService implements OnModuleInit {
     process.env.INCIDENTS_SYSTEM_ID?.trim() || DEFAULT_SYSTEM_ID;
   private readonly apiKey = process.env.INCIDENTS_API_KEY?.trim();
   private readonly jwtToken = process.env.INCIDENTS_JWT_TOKEN?.trim();
+  private readonly minSeverity =
+    process.env.INCIDENTS_MIN_SEVERITY?.trim().toLowerCase() === 'warning'
+      ? 'warning'
+      : DEFAULT_MIN_SEVERITY;
 
   private get enabled(): boolean {
     return !this.explicitlyDisabled && Boolean(this.alertsUrl);
@@ -46,7 +51,9 @@ export class IncidentsEventsService implements OnModuleInit {
       );
     }
 
-    this.logger.log(`Incidents integration enabled → ${this.alertsUrl}`);
+    this.logger.log(
+      `Incidents integration enabled → ${this.alertsUrl} (min severity: ${this.minSeverity})`,
+    );
   }
 
   publishAlert(
@@ -54,6 +61,13 @@ export class IncidentsEventsService implements OnModuleInit {
     context?: AnalyticsAlertContext,
   ): void {
     if (!this.enabled) {
+      return;
+    }
+
+    if (this.minSeverity === 'critical' && alert.severity !== 'critical') {
+      this.logger.debug(
+        `Skipping incidents alert for sensor ${alert.sensorId}: severity ${alert.severity} below threshold`,
+      );
       return;
     }
 

@@ -115,6 +115,7 @@ INCIDENTS_ALERTS_URL=https://proyecto11-mochicode.onrender.com/api/v1/alertas
 INCIDENTS_API_KEY=<api key Zero Trust entregada por P11>
 INCIDENTS_JWT_TOKEN=<token JWT emitido por P12, cuando este disponible>
 INCIDENTS_SYSTEM_ID=P08
+INCIDENTS_MIN_SEVERITY=critical
 INCIDENTS_ALERTS_ENABLED=true
 ```
 
@@ -124,7 +125,10 @@ INCIDENTS_ALERTS_ENABLED=true
 | `INCIDENTS_API_KEY` | API Key Zero Trust de P11. Se envía en el header `x-api-key` |
 | `INCIDENTS_JWT_TOKEN` | Bearer token para autenticación futura con P12, si P11 lo habilita |
 | `INCIDENTS_SYSTEM_ID` | Identificador del sistema emisor (default `P08`) |
+| `INCIDENTS_MIN_SEVERITY` | Severidad mínima que se envía a P11: `critical` (default) o `warning`. Con `critical`, las alertas `warning` no se envían a incidentes |
 | `INCIDENTS_ALERTS_ENABLED` | `false` desactiva el envío aunque haya URL |
+
+> **Solo incidentes críticos:** por defecto P08 envía a P11 únicamente alertas `critical` (las que ameritan un ticket). Las `warning` se siguen guardando en MongoDB, publicando en Kafka y enviando a analítica (P09), pero no generan incidentes en P11.
 
 Payload enviado a P11 (formato camelCase plano dentro del envelope de P11):
 

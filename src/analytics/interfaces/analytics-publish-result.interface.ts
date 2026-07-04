@@ -5,6 +5,6 @@ export interface AnalyticsPublishResult {
   skipped?: boolean;
   eventType?: string;
   eventId?: string;
-  errorCode?: ErrorCode.ANALYTICS_PUBLISH_FAILED;
+  errorCode?: ErrorCode.ANALYTICS_PUBLISH_FAILED | ErrorCode.ANALYTICS_THROTTLED;
   errorMessage?: string;
 }

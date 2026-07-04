@@ -2,6 +2,11 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Alert } from '../alerts/schemas/alert.schema';
 import { AnalyticsAlertContext } from '../analytics/interfaces/analytics-alert-context.interface';
 import { ErrorCode } from '../common/errors/error-codes';
+import {
+  formatHttpFetchErrorLog,
+  parseHttpFetchError,
+  parseHttpStatusError,
+} from '../common/utils/http-fetch-error.util';
 import { mapAlertToIncidentsEnvelope } from './incidents-alert.mapper';
 import { IncidentsPublishResult } from './interfaces/incidents-publish-result.interface';
 
@@ -120,31 +125,19 @@ export class IncidentsEventsService implements OnModuleInit {
         }
 
         const errorBody = await response.text();
+        const parsed = parseHttpStatusError(response.status, errorBody);
         const isRetryable = RETRYABLE_STATUS_CODES.has(response.status);
 
         if (isRetryable && attempt < MAX_RETRIES) {
           const delayMs = BASE_DELAY_MS * 2 ** attempt;
 
           this.logger.warn(
-            `Incidents API returned HTTP ${response.status}, retrying in ${delayMs}ms`,
-          );
-
-          await this.sleep(delayMs);
-          continue;
-        }
-
-        throw new Error(
-          `HTTP ${response.status}: ${errorBody || response.statusText}`,
-        );
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : String(err);
-        const isLastAttempt = attempt === MAX_RETRIES;
-
-        if (!isLastAttempt) {
-          const delayMs = BASE_DELAY_MS * 2 ** attempt;
-
-          this.logger.warn(
-            `Failed to send incidents alert, retrying in ${delayMs}ms: ${errorMessage}`,
+            formatHttpFetchErrorLog(
+              'P11',
+              this.alertsUrl,
+              parsed,
+              `sensor=${envelope.payload.sensorId}, retry in ${delayMs}ms`,
+            ),
           );
 
           await this.sleep(delayMs);
@@ -152,13 +145,52 @@ export class IncidentsEventsService implements OnModuleInit {
         }
 
         this.logger.warn(
-          `Failed to send incidents alert for sensor ${envelope.payload.sensorId}: ${errorMessage}`,
+          formatHttpFetchErrorLog(
+            'P11',
+            this.alertsUrl,
+            parsed,
+            `sensor=${envelope.payload.sensorId}`,
+          ),
         );
 
         return {
           success: false,
           errorCode: ErrorCode.INCIDENTS_PUBLISH_FAILED,
-          errorMessage,
+          errorMessage: `${parsed.message}${parsed.detail ? `: ${parsed.detail}` : ''}`,
+        };
+      } catch (err) {
+        const parsed = parseHttpFetchError(err);
+        const isLastAttempt = attempt === MAX_RETRIES;
+
+        if (!isLastAttempt) {
+          const delayMs = BASE_DELAY_MS * 2 ** attempt;
+
+          this.logger.warn(
+            formatHttpFetchErrorLog(
+              'P11',
+              this.alertsUrl!,
+              parsed,
+              `sensor=${envelope.payload.sensorId}, retry in ${delayMs}ms`,
+            ),
+          );
+
+          await this.sleep(delayMs);
+          continue;
+        }
+
+        this.logger.warn(
+          formatHttpFetchErrorLog(
+            'P11',
+            this.alertsUrl!,
+            parsed,
+            `sensor=${envelope.payload.sensorId}`,
+          ),
+        );
+
+        return {
+          success: false,
+          errorCode: ErrorCode.INCIDENTS_PUBLISH_FAILED,
+          errorMessage: parsed.detail ?? parsed.message,
         };
       }
     }

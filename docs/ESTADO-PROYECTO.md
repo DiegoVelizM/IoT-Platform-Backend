@@ -1,6 +1,6 @@
 # Estado del Proyecto 08 — IoT Platform Backend
 
-**Última actualización:** 02/07/2026  
+**Última actualización:** 04/07/2026  
 **Entrega:** 09/07/2026 (sin margen ese día)  
 **Ventana de trabajo efectiva:** 02/07 → 08/07 (6 días)
 
@@ -10,17 +10,19 @@ Documento maestro de contexto para el equipo. Si algo no cuadra con el código, 
 
 ## 1. Resumen ejecutivo
 
-Somos el **Proyecto 08 — Plataforma IoT** (NestJS). El backend recibe telemetría de sensores médicos simulados, la persiste en MongoDB, genera alertas por umbrales, publica eventos en Kafka y reenvía eventos a **P09 (analítica)** por HTTP.
+Somos el **Proyecto 08 — Plataforma IoT** (NestJS). El backend recibe telemetría de sensores médicos simulados, la persiste en MongoDB, genera alertas por umbrales, publica eventos en Kafka y reenvía eventos a **P09 (analítica)** y **P11 (incidentes)** por HTTP.
 
-**El núcleo funciona y está en producción.** Lo que falta para cerrar el enunciado no es rehacer el proyecto, sino completar piezas de **arquitectura event-driven** (consumer Kafka), **automatización** (simulación sin intervención manual), **escala demostrable** (1.000 sensores + throttling en local) e **integraciones pendientes** con otros grupos.
+**El núcleo funciona y está en producción.** P08 es **backend sin frontend**: la visualización, tendencias y dashboards del enunciado los cubre **P09** consumiendo nuestros eventos HTTP. No tenemos obligación de implementar paneles propios.
+
+Lo que falta para cerrar el enunciado no es rehacer el proyecto, sino completar **consumer Kafka**, **merge/deploy de simulación a escala**, **evidencia documentada de prueba 1.000 sensores**, **retención/agregación mínima** e **integración P06** (otro compañero).
 
 | Métrica | Avance estimado |
 |---------|-----------------|
-| MVP académico (API + Mongo + alertas + Swagger + deploy) | **~85 %** |
-| Entregable presentable (auto-sim + P09 + P01 + consumer + demo) | **~70 %** |
-| Enunciado P08 completo (1.000 sensores, throttling, P06/P11, JWT) | **~55 %** |
+| MVP académico (API + Mongo + alertas + Swagger + deploy) | **~90 %** |
+| Entregable presentable (auto-sim + P09 + P01 + P11 + consumer + demo) | **~80 %** |
+| Enunciado P08 completo (consumer, retención, tests escala, P06) | **~65–70 %** |
 
-**Prioridad hasta el 08/07:** consumer Kafka → auto-start simulación → escala 1.000 sensores + throttling → documentar demo → integración P11 si confirman contrato.
+**Prioridad hasta el 08/07:** consumer Kafka → evidencia 1.000 sensores → retención mínima → P06 → documentar demo → env vars simulación en Render.
 
 ---
 
@@ -50,11 +52,21 @@ Cada lectura incluye `sensorId`, `assetId`, `sensorType`, `batteryLevel`, `conne
 
 | Proyecto | Relación | Dirección | Estado | Notas |
 |----------|----------|-----------|--------|-------|
-| **P01 — Salud** | Consume nuestra API | P01 → P08 | ✅ Contrato listo | `GET /sensors`, `GET /sensors/latest`, `POST /telemetry` |
-| **P09 — Analítica** | Recibe eventos HTTP | P08 → P09 | ✅ Implementado | `POST /v1/events` con envelope `{ source, event_type, payload }` |
-| **P11 — Incidentes** | Podría consumir alertas/eventos | P08 → P11 | ❌ Pendiente | Coordinar formato; ver sección de eventos |
-| **P06 — Notificaciones** | Posible consumidor de alertas | P08 → P06 | ❓ Sin solicitud | No bloquear entrega por esto |
-| **Logística** | — | — | ❌ Descartado | Sin grupo contraparte |
+| **P01 — Salud** | Consume nuestra API | P01 → P08 | ⚠️ Contrato listo, pendiente confirmación | `GET /sensors/*`, `POST /telemetry`. Falta que P01 confirme si solo consumen y si el formato actual les sirve |
+| **P09 — Analítica** | Recibe eventos HTTP + dashboards | P08 → P09 | ✅ Implementado | `POST /v1/events`. **Visualización/tendencias = responsabilidad de P09**, no de P08 |
+| **P11 — Incidentes** | Recibe alertas críticas | P08 → P11 | ✅ Implementado | Solo `critical` (`INCIDENTS_MIN_SEVERITY=critical`). P11 responde HTTP 202 |
+| **P06 — Notificaciones** | Posible consumidor de alertas | P08 → P06 | ⏳ Pendiente | A cargo de otro compañero del equipo |
+| **P02 — Logística** | — | — | ❌ Fuera de alcance | Sin equipo contraparte; dominio activo = salud/P01. No hay rúbrica que exija GPS obligatorio |
+
+### Rate limit de P09 (hallazgo 03/07)
+
+P09 rechaza exceso de tráfico con **HTTP 429**:
+
+```json
+{"detail":"Rate limit excedido: máximo 100 requests por 60s"}
+```
+
+Cada lectura y cada alerta generan un `POST` a P09. Con 100+ sensores o intervalos cortos se supera el límite rápidamente. Para demo integrada con P09 en pantalla: **≤20–50 sensores** e intervalo **≥10 s**. Para prueba de escala local: `ANALYTICS_EVENTS_ENABLED=false`.
 
 ### Formato de eventos (importante)
 
@@ -85,7 +97,8 @@ Sensor / Simulación
    ├→ MongoDB (sensorreadings)
    ├→ Evaluación umbrales → AlertsService → MongoDB (alerts)
    ├→ KafkaProducerService → topics
-   └→ AnalyticsEventsService → HTTP P09
+   ├→ AnalyticsEventsService → HTTP P09 (dashboards/tendencias)
+   └→ IncidentsEventsService → HTTP P11 (solo alertas critical)
 
 GET /sensors/*  ← P01 y pruebas externas
 ```
@@ -150,6 +163,12 @@ Swagger local: http://localhost:3000/docs
 | `ANALYTICS_EVENTS_URL` | Sí | URL P09 (`/v1/events`) |
 | `ANALYTICS_EVENTS_ENABLED` | No | `true` por defecto en `render.yaml` |
 | `SIMULATION_API_KEY` | Sí | Protege `POST /simulation/start` y `/stop` |
+| `SIMULATION_AUTO_START` | No | `true` inicia simulación al arrancar (mergeado PR #19) |
+| `SIMULATION_AUTO_SENSOR_COUNT` | No | Sensores en auto-start (default 4, máx 50 en prod) |
+| `SIMULATION_AUTO_FREQUENCY_MS` | No | Intervalo auto-start (default 10 000 ms) |
+| `SIMULATION_STAGGER_MS` | No | Delay entre arranque de sensores (throttling) |
+| `INCIDENTS_ALERTS_URL` | No | URL P11 |
+| `INCIDENTS_MIN_SEVERITY` | No | `critical` (default) — solo esas alertas van a P11 |
 
 ---
 
@@ -163,77 +182,76 @@ Swagger local: http://localhost:3000/docs
 | Swagger | Documentación con errores estandarizados |
 | MongoDB | Persistencia de lecturas y alertas |
 | Alertas automáticas | Batería baja, offline, umbrales médicos (7 tipos) |
-| Simulación | 4 sensores médicos, frecuencias configurables |
+| Simulación | 4 sensores médicos, frecuencias configurables, auto-start (PR #19) |
+| Escala simulación | Hasta 1.000 `sensorId` distintos + throttling con stagger (PR #19) |
 | Simulación offline | Probabilidad configurable (`SIMULATION_OFFLINE_PROBABILITY`, default 2 %) |
 | Protección simulación | Header `X-Simulation-Key` en start/stop |
 | Kafka Producer | Local + Confluent Cloud (`kafka.config.ts`) |
 | Integración P09 | HTTP automático en telemetría y alertas |
+| Integración P11 | HTTP a alertas críticas (`INCIDENTS_MIN_SEVERITY=critical`, PR #18) |
 | Manejo de errores | `HttpExceptionFilter`, códigos 400/404/500, warnings Kafka |
 | Health check | Probe activo MongoDB + Kafka |
 | Docker Compose | Healthchecks en todos los servicios |
 | Deploy | Render + blueprint `render.yaml` |
-| Documentación | README extenso |
+| Documentación | README + `docs/` |
 
-### ⚠️ Parcial / en rama o sin commitear
+### ⚠️ Parcial / pendiente de cierre
 
 | Área | Estado |
 |------|--------|
-| Commit `f99f213` (probabilidad offline reducida) | En `feat/simulation-offline-events`, **no en `main`** (main tiene merge PR #12 con `29ddbe3`) |
-| Carpeta `docs/` | Creada localmente, **sin commitear** (`KAFKA-CONSUMER.md`, este archivo) |
+| **Confirmación P01** | Contrato publicado; falta que P01 valide consumo y formato de telemetría |
+| **Evidencia formal test escala** | Corrida hecha localmente; falta documentar con consumer Kafka y métricas |
+| **Retención / agregación** | Requisito del enunciado; no implementado aún |
+| **Env vars simulación en Render** | PR #19 mergeado; confirmar `SIMULATION_AUTO_START=true` en Environment manual |
 
 ### ❌ Pendiente (crítico para entrega)
 
 | # | Tarea | Prioridad | Responsable sugerido |
 |---|-------|-----------|----------------------|
 | 1 | **Kafka Consumer** (`KafkaConsumerService`) | 🔴 Alta | Compañero (ver `docs/KAFKA-CONSUMER.md`) |
-| 2 | **Auto-start simulación** (`SIMULATION_AUTO_START=true` al arrancar) | 🔴 Alta | Diego / quien toque simulación |
-| 3 | **Escala 1.000 sensores** (generación de IDs + emisión escalonada) | 🔴 Alta | Equipo |
-| 4 | **Throttling / backpressure** básico | 🔴 Alta | Equipo |
-| 5 | **Demo documentada** (pasos reproducibles para el profesor) | 🟡 Media | Equipo |
-| 6 | **Integración P11** (si confirman contrato) | 🟡 Media | Coordinación externa |
-| 7 | Merge commit probabilidad offline + docs | 🟡 Media | Diego |
-| 8 | Verificar P09 en prod tras deploy | 🟡 Media | Cualquiera |
+| 2 | **Evidencia test 1.000 sensores** documentada | 🔴 Alta | Equipo |
+| 3 | **Env vars simulación en Render** | 🔴 Alta | Diego |
+| 4 | **Retención / agregación mínima** | 🟡 Media | Equipo |
+| 5 | **Integración P06** | 🟡 Media | Otro compañero |
+| 6 | **Confirmación P01** | 🟡 Media | Coordinación externa |
+| 7 | **Demo documentada** (pasos reproducibles) | 🟡 Media | Equipo |
 
 ### ❌ Pendiente (nice-to-have / post-MVP)
 
 | Tarea | Notas |
 |-------|-------|
-| JWT / autenticación API | Dependencia instalada, módulo no implementado |
 | Deduplicación de alertas activas | Evitar alertas repetidas del mismo tipo |
 | Conectar `/events/test` a Kafka | Endpoint temporal hoy solo loguea |
-| Integración P06 notificaciones | Sin solicitud del otro grupo |
+| Throttle explícito hacia P09 | Evitar spam de 429 en logs bajo carga |
 | Kafka consumer en prod | Priorizar que funcione en local; prod es bonus |
+| JWT / autenticación API | No aparece explícito en el enunciado P08; baja prioridad |
 
 ---
 
-## 7. Estado Git (02/07/2026)
+## 7. Estado Git (04/07/2026)
 
 ### Rama principal
 
 ```
-main @ c40318a — Merge PR #12 (simulation offline events)
+main @ d44b5a4 — Merge PR #19 (simulation auto-start + escala 1000)
 ```
 
 ### Historial reciente en `main`
 
 | PR / commit | Qué trajo |
 |-------------|-----------|
+| #19 | Auto-start, 1.000 sensores, stagger/throttling |
+| #18 | P11: solo alertas `critical` (`INCIDENTS_MIN_SEVERITY`) |
+| #14 | Docs estado del proyecto |
 | #12 | Simulación `sensor_offline` con probabilidad configurable |
 | #11 | P09 por env vars (sin URL hardcodeada) |
-| — | API key en simulación start/stop |
-| — | Kafka Confluent Cloud SSL/SASL |
 | #10 | Integración HTTP con P09 |
-| #9 | Manejo de errores HTTP/Kafka |
 
-### Ramas locales (referencia)
+### Ramas activas
 
-Muchas ramas `feat/*` ya mergeadas. Trabajar siempre desde `main` actualizado para tareas nuevas.
-
-### Sin commitear ahora
-
-```
-docs/          ← KAFKA-CONSUMER.md + ESTADO-PROYECTO.md
-```
+| Rama | Estado |
+|------|--------|
+| `feat/kafka-consumer` | Pendiente (otro compañero) |
 
 ---
 
@@ -254,7 +272,7 @@ GET  /health
 ### Solo equipo P08 (requiere `X-Simulation-Key`)
 
 ```http
-GET  /simulation/sensors?quantity=4
+GET  /simulation/sensors?quantity=4   # hasta 1000
 POST /simulation/start
 POST /simulation/stop
 ```
@@ -285,7 +303,7 @@ Hoy publicamos en Kafka pero **nadie lee** esos mensajes dentro de nuestro backe
 
 ### Auto-start simulación
 
-El enunciado pide emisión **sin intervención manual**. Hoy hay que llamar `POST /simulation/start`. Falta que al arrancar el backend, si `SIMULATION_AUTO_START=true`, inicie la simulación sola (respetando la API key solo en prod si aplica, o auto-start solo en local).
+El enunciado pide emisión **sin intervención manual**. Implementado en `main` (PR #19): con `SIMULATION_AUTO_START=true` el backend inicia la simulación al arrancar (defaults conservadores: 4 sensores cada 10 s). Confirmar variable en Render Environment (el blueprint no siempre la aplica sola).
 
 ### 1.000 sensores y throttling → SOLO en LOCAL (Docker)
 
@@ -364,22 +382,28 @@ Así se cubren **ambos requisitos del enunciado** sin arriesgar la cuota del tri
 
 ### Viernes 03/07 — Consumer + auto-start
 
-- [ ] Implementar `KafkaConsumerService` (rama `feat/kafka-consumer`)
-- [ ] Implementar `SIMULATION_AUTO_START` (rama `feat/simulation-auto-start`)
-- [ ] Probar en Docker: producer log + consumer log en mismo backend
+- [ ] Implementar `KafkaConsumerService` (rama `feat/kafka-consumer`) → **pendiente compañero**
+- [x] Implementar `SIMULATION_AUTO_START` (PR #19 mergeado)
+- [x] Extender simulación hasta 1.000 sensores con IDs únicos
+- [x] Throttling básico (stagger entre sensores)
+- [x] Probar localmente: 1.000 lecturas en Mongo; detectado rate limit P09 (429)
+- [x] Actualizar `docs/ESTADO-PROYECTO.md` y README
+- [x] Pull `main` con PR #19 mergeado
 
-### Sábado 04/07 — Escala y throttling
+### Sábado 04/07 — Consumer + evidencia escala
 
-- [ ] Extender simulación para N sensores (hasta 1.000)
-- [ ] Throttling básico (intervalos escalonados + tope configurable)
-- [ ] Correr test local documentado (duración, lecturas procesadas, mensajes Kafka)
+- [ ] `KafkaConsumerService` en local (logs + contador)
+- [x] Logging específico P09/P11 (`RATE_LIMIT`, `NETWORK_ERROR`, etc.)
+- [ ] Correr y documentar test 1.000 sensores (Mongo + mensajes consumer)
+- [ ] Confirmar env vars simulación en Render
 
 ### Domingo 05/07 — Integración y estabilidad
 
-- [ ] Merge PRs a `main`
-- [ ] Deploy Render
-- [ ] Confirmar con P09 que reciben eventos
-- [ ] Contactar P11 si hay contrato de alertas/incidentes
+- [ ] Deploy Render con env vars de simulación
+- [ ] Demo integrada P09 con ≤20 sensores (respetar rate limit)
+- [ ] Verificar P11 con alerta `critical`
+- [ ] Coordinar P06 con compañero asignado
+- [ ] Pedir confirmación a P01 sobre contrato de telemetría
 
 ### Lunes 06/07 — Buffer / deuda
 
@@ -411,9 +435,10 @@ Así se cubren **ambos requisitos del enunciado** sin arriesgar la cuota del tri
 | Persona / rol | Tarea principal | Entregable |
 |---------------|-----------------|------------|
 | Compañero A | Kafka Consumer | `feat/kafka-consumer` + logs en Docker |
-| Compañero B / Diego | Auto-start + escala 1.000 + throttling | `feat/simulation-scale` o similar |
-| Cualquiera | Docs + README demo | Sección "Cómo reproducir la demo" |
-| Coordinación | P01 / P09 / P11 | Confirmar que pueden consumir/probar |
+| Diego | Env vars Render + evidencia escala 1.000 | Deploy + docs |
+| Compañero B | Integración P06 | Según contrato P06 |
+| Cualquiera | Docs + README demo | Perfiles de simulación + evidencia escala |
+| Coordinación | P01 | Confirmar consumo y formato telemetría |
 
 ---
 
@@ -421,16 +446,17 @@ Así se cubren **ambos requisitos del enunciado** sin arriesgar la cuota del tri
 
 Mínimo defendible ante cátedra:
 
-- [ ] Backend en prod accesible (Swagger OK)
-- [ ] Telemetría se guarda en MongoDB
-- [ ] Alertas automáticas funcionan
-- [ ] Simulación arranca sola (auto-start) o está documentado el flujo manual como fallback
-- [ ] Kafka producer publica en local
+- [x] Backend en prod accesible (Swagger OK)
+- [x] Telemetría se guarda en MongoDB
+- [x] Alertas automáticas funcionan
+- [ ] Simulación arranca sola (auto-start activo en Render Environment)
+- [x] Kafka producer publica en local
 - [ ] Kafka consumer procesa mensajes en local (logs visibles)
-- [ ] Test de 1.000 sensores ejecutado en local con throttling (aunque sea corrida corta documentada)
-- [ ] Integración P09 verificada (al menos un evento en su sistema o log de ack)
-- [ ] P01 puede usar `GET /sensors/*` sin clave especial
-- [ ] README + docs actualizados
+- [ ] Test de 1.000 sensores documentado con evidencia (Mongo + consumer)
+- [x] Integración P09 verificada (con rate limit 100 req/min documentado)
+- [x] Integración P11 verificada (solo `critical`, HTTP 202)
+- [ ] P01 confirma que `GET /sensors/*` y telemetría les sirven
+- [x] README + docs actualizados (03/07)
 
 ---
 
@@ -441,8 +467,10 @@ Mínimo defendible ante cátedra:
 | Render free se duerme | Despertar antes de la demo; tener Docker local como plan B |
 | Confluent sin permisos para crear topics | Crearlos manualmente en la consola |
 | 1.000 sensores tumba Mongo local | Throttling + corrida más corta pero documentada |
-| P11 no responde a tiempo | Documentar contrato propuesto (`alert_generated`) sin bloquear entrega |
-| Consumer no listo el 07/07 | Prioridad máxima los días 03–04; MVP = solo `telemetry_received` |
+| P11 front/worker lento | Solo enviamos `critical`; documentar HTTP 202 como éxito de ingesta |
+| P09 rate limit 100 req/min | Perfiles bajos volumen en demo; desactivar analytics en test escala |
+| Consumer no listo el 07/07 | Prioridad máxima sáb 04/07; MVP = solo `telemetry_received` |
+| P02 sin contraparte | Documentar dominio médico/P01; logística fuera de alcance |
 
 ---
 
@@ -460,6 +488,7 @@ src/
 │   ├── analytics-events.service.ts  # HTTP → P09
 │   └── analytics-event.mapper.ts
 ├── alerts/alerts.service.ts
+├── incidents/incidents-events.service.ts  # HTTP → P11
 └── health/health.service.ts
 
 docs/
@@ -504,6 +533,9 @@ curl http://localhost:3000/health
 5. **Demo de escala** = local con Docker, no Render free.
 6. **Simulación start/stop** protegida con API key en prod.
 7. **P09** se integra por HTTP, no consume Kafka directamente.
+8. **Visualización y tendencias** = P09 (dashboards). P08 no tiene frontend propio.
+9. **P02/logística** fuera de alcance por ausencia de equipo contraparte.
+10. **P11** recibe solo alertas `critical`; las `warning` se omiten a propósito.
 
 ---
 

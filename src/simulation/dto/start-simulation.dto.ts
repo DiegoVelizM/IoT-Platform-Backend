@@ -10,6 +10,9 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
+/** Intervalo máximo entre lecturas por sensor (2 minutos). */
+export const MAX_SIMULATION_FREQUENCY_MS = 120_000;
+
 export class SimulatedSensorFrequencyDto {
   @ApiPropertyOptional({
     example: 'OXI-001',
@@ -20,11 +23,11 @@ export class SimulatedSensorFrequencyDto {
 
   @ApiPropertyOptional({
     example: 1000,
-    description: 'Frecuencia de emisión del sensor en milisegundos',
+    description: 'Frecuencia de emisión del sensor en milisegundos (1000–120000)',
   })
   @IsInt()
   @Min(1000)
-  @Max(60000)
+  @Max(MAX_SIMULATION_FREQUENCY_MS)
   frequencyMs!: number;
 }
 
@@ -41,12 +44,12 @@ export class StartSimulationDto {
 
   @ApiPropertyOptional({
     example: 5000,
-    description: 'Frecuencia global de emisión en milisegundos',
+    description: 'Frecuencia global de emisión en milisegundos (1000–120000)',
   })
   @IsOptional()
   @IsInt()
   @Min(1000)
-  @Max(60000)
+  @Max(MAX_SIMULATION_FREQUENCY_MS)
   frequencyMs?: number;
 
   @ApiPropertyOptional({

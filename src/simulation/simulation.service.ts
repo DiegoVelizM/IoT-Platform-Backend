@@ -6,7 +6,10 @@ import {
   MedicalSensorType,
 } from 'src/sensors/dto/create-sensor-reading.dto';
 import { SimulatedSensor } from './interfaces/simulated-sensor.interface';
-import { StartSimulationDto } from './dto/start-simulation.dto';
+import {
+  MAX_SIMULATION_FREQUENCY_MS,
+  StartSimulationDto,
+} from './dto/start-simulation.dto';
 import { SENSOR_THRESHOLDS } from '../sensors/constants/sensor-thresholds.constants';
 
 interface SensorSchedule {
@@ -304,7 +307,7 @@ export class SimulationService implements OnModuleInit {
       return this.AUTO_START_FREQUENCY_MS;
     }
 
-    return Math.min(Math.max(configuredValue, 1000), 60_000);
+    return Math.min(Math.max(configuredValue, 1000), MAX_SIMULATION_FREQUENCY_MS);
   }
 
   private resolveStaggerMs(sensorCount: number, frequencyMs: number): number {

@@ -58,15 +58,35 @@ Cada lectura incluye `sensorId`, `assetId`, `sensorType`, `batteryLevel`, `conne
 | **P06 — Notificaciones** | Posible consumidor de alertas | P08 → P06 | ⏳ Pendiente | A cargo de otro compañero del equipo |
 | **P02 — Logística** | — | — | ❌ Fuera de alcance | Sin equipo contraparte; dominio activo = salud/P01. No hay rúbrica que exija GPS obligatorio |
 
-### Rate limit de P09 (hallazgo 03/07)
+### Hallazgos integración P09 (pruebas 03–04/07)
 
-P09 rechaza exceso de tráfico con **HTTP 429**:
+Documentación ampliada en README. Resumen:
 
-```json
-{"detail":"Rate limit excedido: máximo 100 requests por 60s"}
-```
+**Quién responde:** los HTTP 429/503 y los timeouts son respuestas o fallos de **conexión hacia P09** (`analisis-proyecto-ti.onrender.com`). P08 loguea el resultado; MongoDB y Kafka **no se ven afectados**.
 
-Cada lectura y cada alerta generan un `POST` a P09. Con 100+ sensores o intervalos cortos se supera el límite rápidamente. Para demo integrada con P09 en pantalla: **≤20–50 sensores** e intervalo **≥10 s**. Para prueba de escala local: `ANALYTICS_EVENTS_ENABLED=false`.
+| Categoría log | HTTP / causa | Observado cuando |
+|---------------|--------------|------------------|
+| `[RATE_LIMIT]` | 429 | >100 req/min. Body: `Rate limit excedido: máximo 100 requests por 60s` |
+| `[SERVER_ERROR]` | 502/503 | P09/Render saturado o reiniciando |
+| `[TIMEOUT]` | `UND_ERR_CONNECT_TIMEOUT` (10 s) | Carga extrema; P09 no responde HTTP |
+| `[NETWORK_ERROR]` | `ECONNRESET`, etc. | Conexión cortada |
+
+**Degradación bajo 1000 sensores:** 429 → 503 → TIMEOUT (en ese orden aproximado). Con 1000 sensores cada 60–120 s sigue superándose el rate limit si analytics está activo (~500–1000 telemetría/min).
+
+**Pruebas separadas:**
+
+| Objetivo | Config |
+|----------|--------|
+| Escala P08 | `ANALYTICS_EVENTS_ENABLED=false`; 1000 sensores OK |
+| Demo P09 en pantalla | ≤20–30 sensores, intervalo ≥15 s (hasta 120 s) |
+
+**P11 vs P09:** P11 tolera mejor el tráfico (solo `critical`, 4 reintentos). P09 recibe telemetría + alertas sin reintentos.
+
+**Logging:** PR #20 — `src/common/utils/http-fetch-error.util.ts`, categorías en `AnalyticsEventsService` e `IncidentsEventsService`.
+
+**Simulación:** `frequencyMs` máximo subido a **120000** (2 min) en commit `73e8e98` para reducir carga opcional hacia P09.
+
+**Dashboard P09:** batería promedio ~49 % es esperable (random 5–100 % por lectura). Con ~984 sensores activos la integración ingestiona datos; el cuello de botella es capacidad de P09, no formato P08.
 
 ### Formato de eventos (importante)
 
@@ -456,7 +476,7 @@ Mínimo defendible ante cátedra:
 - [x] Integración P09 verificada (con rate limit 100 req/min documentado)
 - [x] Integración P11 verificada (solo `critical`, HTTP 202)
 - [ ] P01 confirma que `GET /sensors/*` y telemetría les sirven
-- [x] README + docs actualizados (03/07)
+- [x] README + docs actualizados (04/07 — hallazgos P09)
 
 ---
 
@@ -468,7 +488,8 @@ Mínimo defendible ante cátedra:
 | Confluent sin permisos para crear topics | Crearlos manualmente en la consola |
 | 1.000 sensores tumba Mongo local | Throttling + corrida más corta pero documentada |
 | P11 front/worker lento | Solo enviamos `critical`; documentar HTTP 202 como éxito de ingesta |
-| P09 rate limit 100 req/min | Perfiles bajos volumen en demo; desactivar analytics en test escala |
+| P09 rate limit / saturación | 429 → 503 → TIMEOUT bajo carga; demo ≤30 sensores; `ANALYTICS_EVENTS_ENABLED=false` en escala |
+| P09 503 Service Unavailable | Respuesta de P09/Render; P08 persiste en Mongo/Kafka; documentado en README |
 | Consumer no listo el 07/07 | Prioridad máxima sáb 04/07; MVP = solo `telemetry_received` |
 | P02 sin contraparte | Documentar dominio médico/P01; logística fuera de alcance |
 

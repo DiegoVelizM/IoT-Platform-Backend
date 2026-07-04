@@ -108,9 +108,41 @@ ANALYTICS_EVENTS_SOURCE=iot_devices
 | `ANALYTICS_EVENTS_ENABLED` | `false` desactiva el envío aunque haya URL |
 | `ANALYTICS_EVENTS_SOURCE` | Campo `source` del envelope (default `iot_devices`) |
 
-> **Rate limit de P09:** su API rechaza exceso de tráfico con HTTP 429 (`máximo 100 requests por 60s`). Cada lectura y cada alerta generan un `POST` a P09. Para demo integrada con su dashboard en pantalla, usar **≤20–30 sensores** e intervalo **≥15 s**. Para pruebas de escala local con 1.000 sensores, desactivar analytics: `ANALYTICS_EVENTS_ENABLED=false`.
+> **Rate limit de P09:** su API rechaza exceso de tráfico con HTTP 429 (`máximo 100 requests por 60s`). Cada lectura y cada alerta generan un `POST` a P09. Para demo integrada con su dashboard en pantalla, usar **≤20–30 sensores** e intervalo **≥15 s**. Para pruebas de escala con 1.000 sensores, desactivar analytics: `ANALYTICS_EVENTS_ENABLED=false`.
 
-Los fallos hacia P09/P11 se loguean con categoría explícita: `RATE_LIMIT`, `SERVER_ERROR`, `CLIENT_ERROR`, `NETWORK_ERROR`, `TIMEOUT`, incluyendo URL destino y detalle de red (`ECONNRESET`, `ETIMEDOUT`, etc.) cuando aplica.
+#### Hallazgos de integración P09 (pruebas 03–04/07)
+
+P09 corre en **Render free** y responde desde su propio backend. P08 solo reenvía eventos; los errores HTTP vienen de **P09**, no de un fallo de ingestión en P08. MongoDB y Kafka en P08 **siguen funcionando** aunque falle el envío a P09.
+
+| Categoría en log | Origen | Qué significa |
+|------------------|--------|---------------|
+| `[RATE_LIMIT]` | Respuesta **P09** HTTP 429 | Superado el límite de 100 req/min. Body típico: `{"detail":"Rate limit excedido: máximo 100 requests por 60s"}` |
+| `[SERVER_ERROR]` | Respuesta **P09** HTTP 502/503 | P09/Render no puede atender (saturado, reiniciando, cold start) |
+| `[TIMEOUT]` | Sin respuesta HTTP en 10 s | P09 no alcanza a responder (`UND_ERR_CONNECT_TIMEOUT`). Suele aparecer bajo carga extrema |
+| `[NETWORK_ERROR]` | Conexión cortada | `ECONNRESET`, `fetch failed`, etc. |
+
+Ejemplo de log (PR #20, `AnalyticsEventsService`):
+
+```txt
+WARN P09 publish failed (telemetry_received) [RATE_LIMIT]: {"detail":"Rate limit excedido..."} → https://analisis-proyecto-ti.onrender.com/v1/events
+WARN P09 publish failed (telemetry_received) [SERVER_ERROR]: HTTP 503 → https://analisis-proyecto-ti.onrender.com/v1/events
+WARN P09 publish failed (telemetry_received) [TIMEOUT]: UND_ERR_CONNECT_TIMEOUT: Connect Timeout Error → https://...
+```
+
+**Degradación observada bajo carga alta** (ej. 1000 sensores): primero `429`, luego `503`, luego predominan `TIMEOUT`. No es un bug de P08; es el límite de capacidad de P09/Render.
+
+**Dos pruebas separadas (no mezclar):**
+
+| Objetivo | Configuración |
+|----------|---------------|
+| Escala P08 (1000 sensores, Mongo, Kafka) | `ANALYTICS_EVENTS_ENABLED=false` — local o prod; no satura P09 |
+| Demo integrada con dashboard P09 | `quantity: 20–30`, `frequencyMs: 15000–120000` — analytics activo |
+
+> Correr 1000 sensores con analytics activo **desde local** igual golpea P09 en prod (misma URL). Desactivar analytics en pruebas de escala.
+
+**P11 vs P09:** P11 recibe solo alertas `critical` (mucho menos volumen) y reintenta hasta 4 veces. P09 recibe **cada telemetría + cada alerta** sin reintentos, para no multiplicar carga ante `429`.
+
+Los fallos hacia P09/P11 se loguean con categoría explícita (`RATE_LIMIT`, `SERVER_ERROR`, `CLIENT_ERROR`, `NETWORK_ERROR`, `TIMEOUT`), URL destino y detalle de red cuando aplica. Implementación: `src/common/utils/http-fetch-error.util.ts`.
 
 **Integración con incidentes (Proyecto 11):** al generar una alerta, el backend envía un `POST` al endpoint de ingesta de P11:
 
@@ -295,6 +327,8 @@ En local, definir `SIMULATION_API_KEY` en `.env`.
 
 La simulación genera fallos `sensor_offline` con baja probabilidad para ejercitar el topic Kafka `sensor_offline` y las alertas críticas. Por defecto usa 2% (`0.02`) y aumenta levemente cuando la batería simulada está baja o crítica.
 
+La batería simulada es aleatoria entre **5 % y 100 %** por lectura (`getRandomBatteryLevel`), con promedio teórico ~50 %. En el dashboard de P09 es normal ver ~49 % de batería promedio y muchos sensores en “batería baja”.
+
 ```env
 SIMULATION_OFFLINE_PROBABILITY=0.02
 ```
@@ -319,7 +353,7 @@ SIMULATION_STAGGER_MS=
 
 En **Render (prod)** se usa auto-start conservador: 4 sensores cada 10 s (~0,4 lecturas/s), con arranque escalonado para no saturar MongoDB, Kafka, P09 ni P11. Para pruebas de escala (hasta 1.000 sensores), usar `POST /simulation/start` en **local** con Docker.
 
-**Generación de hasta 1.000 sensores:** `GET /simulation/sensors?quantity=1000` devuelve IDs únicos rotando tipos (`THERMO-001`, `GLUCO-001`, `OXI-001`, `BP-001`, `THERMO-002`, …). `POST /simulation/start` acepta `quantity` hasta 1000.
+**Generación de hasta 1.000 sensores:** `GET /simulation/sensors?quantity=1000` devuelve IDs únicos rotando tipos (`THERMO-001`, `GLUCO-001`, `OXI-001`, `BP-001`, `THERMO-002`, …). `POST /simulation/start` acepta `quantity` hasta 1000 y `frequencyMs` entre **1000 y 120000** (2 min).
 
 Ejemplo — iniciar simulación manual con frecuencia global:
 
@@ -359,14 +393,14 @@ P08 no tiene frontend propio. La **visualización y tendencias** del enunciado l
 |--------|-------|---------------|-----|
 | **Prod / demo diaria** | Render | Auto-start: 4 sensores cada 10 s | Swagger, P01, flujo estable |
 | **Demo con P09 en pantalla** | Local o prod | `quantity: 20–30`, `frequencyMs: 15000+` | Respetar rate limit P09 (100 req/min) |
-| **Escala 1.000 sensores** | Solo Docker local | `quantity: 1000`, `frequencyMs: 20000`, `ANALYTICS_EVENTS_ENABLED=false` | Validar Mongo + Kafka + consumer |
+| **Escala 1.000 sensores** | Solo Docker local | `quantity: 1000`, `frequencyMs: 60000–120000`, `ANALYTICS_EVENTS_ENABLED=false` | Validar Mongo + Kafka + consumer; no enviar a P09 |
 
-Ejemplo — escala local sin saturar P09:
+Ejemplo — escala local sin P09:
 
 ```json
 {
   "quantity": 1000,
-  "frequencyMs": 20000
+  "frequencyMs": 120000
 }
 ```
 

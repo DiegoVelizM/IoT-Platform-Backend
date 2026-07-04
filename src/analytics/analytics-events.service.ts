@@ -3,6 +3,11 @@ import { Alert } from '../alerts/schemas/alert.schema';
 import { SensorReading } from '../sensors/schemas/sensor-reading.schema';
 import { ErrorCode } from '../common/errors/error-codes';
 import {
+  formatHttpFetchErrorLog,
+  parseHttpFetchError,
+  parseHttpStatusError,
+} from '../common/utils/http-fetch-error.util';
+import {
   mapAlertToAnalyticsEvent,
   mapTelemetryReceivedEvent,
 } from './analytics-event.mapper';
@@ -95,10 +100,23 @@ export class AnalyticsEventsService implements OnModuleInit {
 
       if (!response.ok) {
         const errorBody = await response.text();
+        const parsed = parseHttpStatusError(response.status, errorBody);
 
-        throw new Error(
-          `HTTP ${response.status}: ${errorBody || response.statusText}`,
+        this.logger.warn(
+          formatHttpFetchErrorLog(
+            'P09',
+            this.eventsUrl,
+            parsed,
+            envelope.event_type,
+          ),
         );
+
+        return {
+          success: false,
+          eventType: envelope.event_type,
+          errorCode: ErrorCode.ANALYTICS_PUBLISH_FAILED,
+          errorMessage: `${parsed.message}${parsed.detail ? `: ${parsed.detail}` : ''}`,
+        };
       }
 
       const body = (await response.json()) as {
@@ -116,17 +134,22 @@ export class AnalyticsEventsService implements OnModuleInit {
         eventId: body.event_id,
       };
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
+      const parsed = parseHttpFetchError(err);
 
       this.logger.warn(
-        `Failed to send analytics event ${envelope.event_type}: ${errorMessage}`,
+        formatHttpFetchErrorLog(
+          'P09',
+          this.eventsUrl!,
+          parsed,
+          envelope.event_type,
+        ),
       );
 
       return {
         success: false,
         eventType: envelope.event_type,
         errorCode: ErrorCode.ANALYTICS_PUBLISH_FAILED,
-        errorMessage,
+        errorMessage: parsed.detail ?? parsed.message,
       };
     }
   }

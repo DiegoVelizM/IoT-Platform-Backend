@@ -108,6 +108,10 @@ ANALYTICS_EVENTS_SOURCE=iot_devices
 | `ANALYTICS_EVENTS_ENABLED` | `false` desactiva el envío aunque haya URL |
 | `ANALYTICS_EVENTS_SOURCE` | Campo `source` del envelope (default `iot_devices`) |
 
+> **Rate limit de P09:** su API rechaza exceso de tráfico con HTTP 429 (`máximo 100 requests por 60s`). Cada lectura y cada alerta generan un `POST` a P09. Para demo integrada con su dashboard en pantalla, usar **≤20–30 sensores** e intervalo **≥15 s**. Para pruebas de escala local con 1.000 sensores, desactivar analytics: `ANALYTICS_EVENTS_ENABLED=false`.
+
+Los fallos hacia P09/P11 se loguean con categoría explícita: `RATE_LIMIT`, `SERVER_ERROR`, `CLIENT_ERROR`, `NETWORK_ERROR`, `TIMEOUT`, incluyendo URL destino y detalle de red (`ECONNRESET`, `ETIMEDOUT`, etc.) cuando aplica.
+
 **Integración con incidentes (Proyecto 11):** al generar una alerta, el backend envía un `POST` al endpoint de ingesta de P11:
 
 ```env
@@ -315,6 +319,8 @@ SIMULATION_STAGGER_MS=
 
 En **Render (prod)** se usa auto-start conservador: 4 sensores cada 10 s (~0,4 lecturas/s), con arranque escalonado para no saturar MongoDB, Kafka, P09 ni P11. Para pruebas de escala (hasta 1.000 sensores), usar `POST /simulation/start` en **local** con Docker.
 
+**Generación de hasta 1.000 sensores:** `GET /simulation/sensors?quantity=1000` devuelve IDs únicos rotando tipos (`THERMO-001`, `GLUCO-001`, `OXI-001`, `BP-001`, `THERMO-002`, …). `POST /simulation/start` acepta `quantity` hasta 1000.
+
 Ejemplo — iniciar simulación manual con frecuencia global:
 
 ```json
@@ -344,6 +350,36 @@ Ejemplo — frecuencias individuales por sensor:
   ]
 }
 ```
+
+### Perfiles de simulación recomendados
+
+P08 no tiene frontend propio. La **visualización y tendencias** del enunciado las cubre **P09** con los eventos HTTP que enviamos. Estos perfiles evitan saturar integraciones externas:
+
+| Perfil | Dónde | Configuración | Uso |
+|--------|-------|---------------|-----|
+| **Prod / demo diaria** | Render | Auto-start: 4 sensores cada 10 s | Swagger, P01, flujo estable |
+| **Demo con P09 en pantalla** | Local o prod | `quantity: 20–30`, `frequencyMs: 15000+` | Respetar rate limit P09 (100 req/min) |
+| **Escala 1.000 sensores** | Solo Docker local | `quantity: 1000`, `frequencyMs: 20000`, `ANALYTICS_EVENTS_ENABLED=false` | Validar Mongo + Kafka + consumer |
+
+Ejemplo — escala local sin saturar P09:
+
+```json
+{
+  "quantity": 1000,
+  "frequencyMs": 20000
+}
+```
+
+Ejemplo — demo integrada con P09:
+
+```json
+{
+  "quantity": 30,
+  "frequencyMs": 15000
+}
+```
+
+> **P02 (logística):** sin equipo contraparte; el dominio activo es salud/P01. No hay requisito de GPS en la rúbrica.
 
 ---
 
@@ -453,7 +489,11 @@ Sensores simulados / POST /telemetry
   → MongoDB (sensorreadings)
   → Evaluación de umbrales → AlertsService → MongoDB (alerts)
   → KafkaProducerService → topics Kafka
+  → AnalyticsEventsService → HTTP P09 (dashboards y tendencias)
+  → IncidentsEventsService → HTTP P11 (solo alertas critical)
 ```
+
+P08 expone datos vía API (`GET /sensors/*`) para **P01** y eventos HTTP para **P09** (visualización) y **P11** (incidentes críticos). No implementamos paneles propios.
 
 Topics Kafka publicados:
 
@@ -678,7 +718,7 @@ Si el broker es incorrecto o inalcanzable, la API sigue operativa pero los event
 
 ## Estado del proyecto
 
-Proyecto académico en desarrollo activo.
+Proyecto académico en desarrollo activo. Documentación detallada del equipo: [`docs/ESTADO-PROYECTO.md`](docs/ESTADO-PROYECTO.md).
 
 **Implementado:**
 
@@ -687,17 +727,29 @@ Proyecto académico en desarrollo activo.
 - Persistencia en MongoDB
 - Generación automática de alertas por umbrales
 - Productor Kafka con publicación de eventos
+- Integración HTTP con P09 (analítica / dashboards)
+- Integración HTTP con P11 (incidentes, solo alertas `critical`)
 - Estandarización de errores HTTP 400/404/500 con `HttpExceptionFilter`
 - Manejo estructurado de errores Kafka con `warnings` en respuestas y estado en `/health`
 - Documentación Swagger con respuestas de error por endpoint
-- Catálogo de errores API y Kafka en README
+- Auto-start con `SIMULATION_AUTO_START=true` (PR #19)
+- Generación de hasta 1.000 `sensorId` distintos
+- Throttling básico con arranque escalonado (`SIMULATION_STAGGER_MS`)
 - Contenerización con Docker Compose
 
 **Pendiente / en progreso:**
 
-- Consumidores Kafka
-- Autenticación JWT (dependencias instaladas, módulo no implementado)
+- Consumidor Kafka (`docs/KAFKA-CONSUMER.md` — otro compañero)
+- Evidencia documentada de prueba 1.000 sensores (Mongo + consumer)
+- Retención y agregación de datos (requisito del enunciado)
+- Integración P06 notificaciones (otro compañero)
+- Confirmación de P01 sobre contrato de telemetría
 - Deduplicación y resolución de alertas activas
 - Integración del endpoint `/events/test` con Kafka
+
+**Fuera de alcance:**
+
+- P02 logística (sin equipo contraparte)
+- Frontend propio (visualización = P09)
 
 ---

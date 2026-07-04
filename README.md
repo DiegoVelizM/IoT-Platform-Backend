@@ -107,7 +107,8 @@ ANALYTICS_EVENTS_SOURCE=iot_devices
 | `ANALYTICS_EVENTS_URL` | Endpoint de P09. **Si no está definida, la integración queda deshabilitada** (se registra un warning al arrancar) |
 | `ANALYTICS_EVENTS_ENABLED` | `false` desactiva el envío aunque haya URL |
 | `ANALYTICS_EVENTS_SOURCE` | Campo `source` del envelope (default `iot_devices`) |
-| `ANALYTICS_MAX_REQUESTS_PER_MINUTE` | Throttle local hacia P09 (default `90` req/min, bajo su límite de 100). `0` desactiva el throttle local |
+| `ANALYTICS_MAX_REQUESTS_PER_MINUTE` | Ritmo de envío hacia P09 (default `90` req/min). `0` desactiva el límite de tasa |
+| `ANALYTICS_QUEUE_MAX_SIZE` | Cola de espera acotada antes de enviar a P09 (default `200`). Si se llena, se descartan eventos nuevos con log |
 
 > **Rate limit de P09:** su API rechaza exceso de tráfico con HTTP 429 (`máximo 100 requests por 60s`). Cada lectura y cada alerta generan un `POST` a P09. Para demo integrada con su dashboard en pantalla, usar **≤20–30 sensores** e intervalo **≥15 s**. Para pruebas de escala con 1.000 sensores, desactivar analytics: `ANALYTICS_EVENTS_ENABLED=false`.
 
@@ -141,7 +142,7 @@ WARN P09 publish failed (telemetry_received) [TIMEOUT]: UND_ERR_CONNECT_TIMEOUT:
 
 > Correr 1000 sensores con analytics activo **desde local** igual golpea P09 en prod (misma URL). Desactivar analytics en pruebas de escala.
 
-**P11 vs P09:** P11 recibe solo alertas `critical` (mucho menos volumen) y reintenta hasta 4 veces. P09 recibe **cada telemetría + cada alerta** sin reintentos. P08 aplica **throttle local** (`ANALYTICS_MAX_REQUESTS_PER_MINUTE`, default 90/min) para no superar el rate limit de P09 antes de que responda 429.
+**P11 vs P09:** P11 recibe solo alertas `critical` (mucho menos volumen) y reintenta hasta 4 veces. P09 recibe **cada telemetría + cada alerta** sin reintentos. P08 encola eventos hacia P09 (máx **200** en espera) y los envía a ~**90/min** (`ANALYTICS_MAX_REQUESTS_PER_MINUTE`); solo se descartan si la cola está llena.
 
 Los fallos hacia P09/P11 se loguean con categoría explícita (`RATE_LIMIT`, `SERVER_ERROR`, `CLIENT_ERROR`, `NETWORK_ERROR`, `TIMEOUT`), URL destino y detalle de red cuando aplica. Implementación: `src/common/utils/http-fetch-error.util.ts`.
 

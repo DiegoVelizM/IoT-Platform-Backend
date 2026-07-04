@@ -26,6 +26,12 @@ services:
         value: "true"
       - key: SIMULATION_API_KEY
         generateValue: true
+      - key: SIMULATION_AUTO_START
+        value: "true"
+      - key: SIMULATION_AUTO_SENSOR_COUNT
+        value: "4"
+      - key: SIMULATION_AUTO_FREQUENCY_MS
+        value: "10000"
       - key: INCIDENTS_ALERTS_URL
         value: https://proyecto11-mochicode.onrender.com/api/v1/alertas
       - key: INCIDENTS_API_KEY

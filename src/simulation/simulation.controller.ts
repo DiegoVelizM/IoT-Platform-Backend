@@ -22,8 +22,12 @@ export class SimulationController {
     description: 'Cantidad de sensores simulados a generar',
   })
   generateSensors(@Query('quantity') quantity?: string) {
-    const parsedQuantity = quantity ? Number(quantity) : 5;
-    return this.simulationService.generateSensors(parsedQuantity);
+    const parsedQuantity = quantity ? Number(quantity) : 4;
+    const safeQuantity = Number.isFinite(parsedQuantity)
+      ? Math.min(Math.max(Math.floor(parsedQuantity), 1), 1000)
+      : 4;
+
+    return this.simulationService.generateSensors(safeQuantity);
   }
 
   @Post('start')

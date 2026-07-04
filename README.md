@@ -297,11 +297,38 @@ SIMULATION_OFFLINE_PROBABILITY=0.02
 
 Usar `0` si se desea desactivar eventos offline en una demo específica. El valor máximo efectivo es `0.25`.
 
-Ejemplo — iniciar simulación con frecuencia global:
+**Auto-start al arrancar** (sin llamar manualmente a `/simulation/start`):
+
+```env
+SIMULATION_AUTO_START=true
+SIMULATION_AUTO_SENSOR_COUNT=4
+SIMULATION_AUTO_FREQUENCY_MS=10000
+SIMULATION_STAGGER_MS=
+```
+
+| Variable | Efecto |
+|----------|--------|
+| `SIMULATION_AUTO_START` | `true` inicia la simulación al levantar el backend |
+| `SIMULATION_AUTO_SENSOR_COUNT` | Cantidad de sensores en auto-start (default `4`, máximo `50`) |
+| `SIMULATION_AUTO_FREQUENCY_MS` | Intervalo entre lecturas por sensor en auto-start (default `10000` ms) |
+| `SIMULATION_STAGGER_MS` | Retardo entre el arranque de cada sensor. Si no se define, se reparte automáticamente dentro del intervalo |
+
+En **Render (prod)** se usa auto-start conservador: 4 sensores cada 10 s (~0,4 lecturas/s), con arranque escalonado para no saturar MongoDB, Kafka, P09 ni P11. Para pruebas de escala (hasta 1.000 sensores), usar `POST /simulation/start` en **local** con Docker.
+
+Ejemplo — iniciar simulación manual con frecuencia global:
 
 ```json
 {
   "frequencyMs": 5000
+}
+```
+
+Ejemplo — escala local (hasta 1.000 sensores, solo en Docker):
+
+```json
+{
+  "quantity": 1000,
+  "frequencyMs": 10000
 }
 ```
 

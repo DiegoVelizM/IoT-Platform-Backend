@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { SensorsService } from '../sensors/sensors.service';
 import {
   ConnectionStatus,
@@ -9,66 +9,169 @@ import { SimulatedSensor } from './interfaces/simulated-sensor.interface';
 import { StartSimulationDto } from './dto/start-simulation.dto';
 import { SENSOR_THRESHOLDS } from '../sensors/constants/sensor-thresholds.constants';
 
+interface SensorSchedule {
+  sensorId: string;
+  frequencyMs: number;
+  staggerOffsetMs: number;
+}
+
 @Injectable()
-export class SimulationService {
+export class SimulationService implements OnModuleInit {
   private readonly logger = new Logger(SimulationService.name);
-  private intervalIds: NodeJS.Timeout[] = [];
+  private readonly timeoutIds: NodeJS.Timeout[] = [];
+  private readonly intervalIds: NodeJS.Timeout[] = [];
 
   private readonly EMIT_INTERVAL_MS = 5000;
+  private readonly AUTO_START_FREQUENCY_MS = 10_000;
+  private readonly AUTO_START_SENSOR_COUNT = 4;
+  private readonly MAX_AUTO_START_SENSOR_COUNT = 50;
+  private readonly MAX_MANUAL_SENSOR_COUNT = 1000;
   private readonly DEFAULT_OFFLINE_PROBABILITY = 0.02;
   private readonly MAX_OFFLINE_PROBABILITY = 0.25;
   private readonly offlineProbability = this.resolveOfflineProbability();
 
   constructor(private readonly sensorsService: SensorsService) {}
 
-  generateSensors(quantity = 4): SimulatedSensor[] {
-    const defaultSensors = this.getDefaultMedicalSensors();
+  onModuleInit(): void {
+    if (process.env.SIMULATION_AUTO_START !== 'true') {
+      return;
+    }
 
-    return defaultSensors.slice(0, quantity);
+    const quantity = this.resolveAutoStartSensorCount();
+    const frequencyMs = this.resolveAutoStartFrequencyMs();
+
+    this.logger.log(
+      `Auto-start habilitado: ${quantity} sensores cada ${frequencyMs} ms (con arranque escalonado)`,
+    );
+
+    this.startSimulation({ quantity, frequencyMs });
+  }
+
+  generateSensors(quantity = 4): SimulatedSensor[] {
+    const safeQuantity = this.clampQuantity(quantity, this.MAX_MANUAL_SENSOR_COUNT);
+
+    return Array.from({ length: safeQuantity }, (_, index) =>
+      this.buildSimulatedSensor(index),
+    );
   }
 
   startSimulation(config?: StartSimulationDto) {
-    if (this.intervalIds.length > 0) {
+    if (this.isRunning()) {
       return { message: 'La simulación ya está en ejecución' };
     }
 
-    const sensorConfigs =
-      config?.sensors && config.sensors.length > 0
-        ? config.sensors
-        : this.buildDefaultSensorConfigs(config);
+    const sensorSchedules = this.buildSensorSchedules(config);
 
-    sensorConfigs.forEach((sensorConfig) => {
-      const intervalId = setInterval(() => {
-        void this.generateAndSendReading(sensorConfig.sensorId);
-      }, sensorConfig.frequencyMs);
+    sensorSchedules.forEach((schedule) => {
+      const timeoutId = setTimeout(() => {
+        const intervalId = setInterval(() => {
+          void this.generateAndSendReading(schedule.sensorId);
+        }, schedule.frequencyMs);
 
-      this.intervalIds.push(intervalId);
+        this.intervalIds.push(intervalId);
 
-      this.logger.log(
-        `Simulación iniciada para ${sensorConfig.sensorId} cada ${sensorConfig.frequencyMs} ms`,
-      );
+        this.logger.log(
+          `Simulación activa para ${schedule.sensorId} cada ${schedule.frequencyMs} ms`,
+        );
+      }, schedule.staggerOffsetMs);
+
+      this.timeoutIds.push(timeoutId);
+
+      if (schedule.staggerOffsetMs > 0) {
+        this.logger.log(
+          `Simulación programada para ${schedule.sensorId} en ${schedule.staggerOffsetMs} ms`,
+        );
+      }
     });
 
     return {
       message: 'Simulación iniciada correctamente',
-      sensors: sensorConfigs,
+      sensors: sensorSchedules.map(({ sensorId, frequencyMs, staggerOffsetMs }) => ({
+        sensorId,
+        frequencyMs,
+        staggerOffsetMs,
+      })),
     };
   }
 
   stopSimulation() {
+    this.timeoutIds.forEach((timeout) => clearTimeout(timeout));
     this.intervalIds.forEach((interval) => clearInterval(interval));
-    this.intervalIds = [];
+    this.timeoutIds.length = 0;
+    this.intervalIds.length = 0;
 
     return { message: 'Simulación detenida correctamente' };
   }
 
-  private buildDefaultSensorConfigs(config?: StartSimulationDto) {
-    const frequencyMs = config?.frequencyMs ?? this.EMIT_INTERVAL_MS;
+  private isRunning(): boolean {
+    return this.timeoutIds.length > 0 || this.intervalIds.length > 0;
+  }
 
-    return this.getDefaultMedicalSensors().map((sensor) => ({
+  private buildSensorSchedules(config?: StartSimulationDto): SensorSchedule[] {
+    if (config?.sensors && config.sensors.length > 0) {
+      const staggerMs = this.resolveStaggerMs(
+        config.sensors.length,
+        config.frequencyMs ?? this.EMIT_INTERVAL_MS,
+      );
+
+      return config.sensors.map((sensorConfig, index) => ({
+        sensorId: sensorConfig.sensorId,
+        frequencyMs: sensorConfig.frequencyMs,
+        staggerOffsetMs: index * staggerMs,
+      }));
+    }
+
+    const quantity = this.clampQuantity(
+      config?.quantity ?? this.AUTO_START_SENSOR_COUNT,
+      this.MAX_MANUAL_SENSOR_COUNT,
+    );
+    const frequencyMs = config?.frequencyMs ?? this.EMIT_INTERVAL_MS;
+    const staggerMs = this.resolveStaggerMs(quantity, frequencyMs);
+
+    return this.generateSensors(quantity).map((sensor, index) => ({
       sensorId: sensor.sensorId,
       frequencyMs,
+      staggerOffsetMs: index * staggerMs,
     }));
+  }
+
+  private buildSimulatedSensor(index: number): SimulatedSensor {
+    const templates = this.getSensorTemplates();
+    const template = templates[index % templates.length];
+    const sequence = Math.floor(index / templates.length) + 1;
+
+    return {
+      sensorId: `${template.prefix}-${String(sequence).padStart(3, '0')}`,
+      assetId: template.assetId,
+      type: template.type,
+      batteryLevel: this.getRandomBatteryLevel(),
+      status: 'active',
+    };
+  }
+
+  private getSensorTemplates() {
+    return [
+      {
+        prefix: 'THERMO',
+        type: MedicalSensorType.THERMOMETER,
+        assetId: 'MEDKIT-001',
+      },
+      {
+        prefix: 'GLUCO',
+        type: MedicalSensorType.GLUCOMETER,
+        assetId: 'PATIENT-001',
+      },
+      {
+        prefix: 'OXI',
+        type: MedicalSensorType.PULSE_OXIMETER,
+        assetId: 'PATIENT-001',
+      },
+      {
+        prefix: 'BP',
+        type: MedicalSensorType.SPHYGMOMANOMETER,
+        assetId: 'PATIENT-001',
+      },
+    ];
   }
 
   private async generateAndSendReading(sensorId: string): Promise<void> {
@@ -91,42 +194,11 @@ export class SimulationService {
       await this.sensorsService.create(reading);
       this.logger.debug(`Lectura médica simulada guardada para ${sensorId}`);
     } catch (error) {
-      this.logger.error(`Error guardando lectura médica simulada para ${sensorId}`, error instanceof Error ? error.stack : String(error),
+      this.logger.error(
+        `Error guardando lectura médica simulada para ${sensorId}`,
+        error instanceof Error ? error.stack : String(error),
       );
     }
-  }
-
-  private getDefaultMedicalSensors(): SimulatedSensor[] {
-    return [
-      {
-        sensorId: 'THERMO-001',
-        assetId: 'MEDKIT-001',
-        type: MedicalSensorType.THERMOMETER,
-        batteryLevel: this.getRandomBatteryLevel(),
-        status: 'active',
-      },
-      {
-        sensorId: 'GLUCO-001',
-        assetId: 'PATIENT-001',
-        type: MedicalSensorType.GLUCOMETER,
-        batteryLevel: this.getRandomBatteryLevel(),
-        status: 'active',
-      },
-      {
-        sensorId: 'OXI-001',
-        assetId: 'PATIENT-001',
-        type: MedicalSensorType.PULSE_OXIMETER,
-        batteryLevel: this.getRandomBatteryLevel(),
-        status: 'active',
-      },
-      {
-        sensorId: 'BP-001',
-        assetId: 'PATIENT-001',
-        type: MedicalSensorType.SPHYGMOMANOMETER,
-        batteryLevel: this.getRandomBatteryLevel(),
-        status: 'active',
-      },
-    ];
   }
 
   private getMedicalSensorTypeFromId(sensorId: string): MedicalSensorType {
@@ -210,5 +282,50 @@ export class SimulationService {
     }
 
     return Math.min(Math.max(configuredValue, 0), this.MAX_OFFLINE_PROBABILITY);
+  }
+
+  private resolveAutoStartSensorCount(): number {
+    const configuredValue = Number(process.env.SIMULATION_AUTO_SENSOR_COUNT);
+
+    if (!Number.isFinite(configuredValue)) {
+      return this.AUTO_START_SENSOR_COUNT;
+    }
+
+    return this.clampQuantity(
+      configuredValue,
+      this.MAX_AUTO_START_SENSOR_COUNT,
+    );
+  }
+
+  private resolveAutoStartFrequencyMs(): number {
+    const configuredValue = Number(process.env.SIMULATION_AUTO_FREQUENCY_MS);
+
+    if (!Number.isFinite(configuredValue)) {
+      return this.AUTO_START_FREQUENCY_MS;
+    }
+
+    return Math.min(Math.max(configuredValue, 1000), 60_000);
+  }
+
+  private resolveStaggerMs(sensorCount: number, frequencyMs: number): number {
+    const configuredValue = Number(process.env.SIMULATION_STAGGER_MS);
+
+    if (Number.isFinite(configuredValue) && configuredValue >= 0) {
+      return configuredValue;
+    }
+
+    if (sensorCount <= 1) {
+      return 0;
+    }
+
+    return Math.max(100, Math.floor(frequencyMs / sensorCount));
+  }
+
+  private clampQuantity(quantity: number, max: number): number {
+    if (!Number.isFinite(quantity) || quantity < 1) {
+      return 1;
+    }
+
+    return Math.min(Math.floor(quantity), max);
   }
 }

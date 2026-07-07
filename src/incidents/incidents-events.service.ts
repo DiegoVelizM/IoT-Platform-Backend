@@ -11,7 +11,7 @@ import { mapAlertToIncidentsEnvelope } from './incidents-alert.mapper';
 import { IncidentsPublishResult } from './interfaces/incidents-publish-result.interface';
 
 const DEFAULT_SYSTEM_ID = 'P08';
-const DEFAULT_MIN_SEVERITY = 'critical';
+const DEFAULT_MIN_SEVERITY = 'warning';
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 500;
 const RETRYABLE_STATUS_CODES = new Set([429, 502, 503]);
@@ -27,8 +27,8 @@ export class IncidentsEventsService implements OnModuleInit {
   private readonly apiKey = process.env.INCIDENTS_API_KEY?.trim();
   private readonly jwtToken = process.env.INCIDENTS_JWT_TOKEN?.trim();
   private readonly minSeverity =
-    process.env.INCIDENTS_MIN_SEVERITY?.trim().toLowerCase() === 'warning'
-      ? 'warning'
+    process.env.INCIDENTS_MIN_SEVERITY?.trim().toLowerCase() === 'critical'
+      ? 'critical'
       : DEFAULT_MIN_SEVERITY;
 
   private get enabled(): boolean {

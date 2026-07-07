@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { MedicalSensorType } from './create-sensor-reading.dto';
 
@@ -18,5 +18,6 @@ export class ListSensorDevicesQueryDto extends PaginationQueryDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   search?: string;
 }

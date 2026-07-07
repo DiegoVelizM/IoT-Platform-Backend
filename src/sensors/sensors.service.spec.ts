@@ -238,6 +238,24 @@ describe('SensorsService', () => {
         total: 0,
       });
     });
+
+    it('escapes regex special characters in search', async () => {
+      aggregateMock.mockResolvedValue([
+        { data: [], meta: [{ total: 0 }] },
+      ]);
+
+      await service.findDevices({ page: 1, limit: 25, search: 'OXI-001' });
+
+      expect(aggregateMock).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          {
+            $match: {
+              sensorId: { $regex: 'OXI-001', $options: 'i' },
+            },
+          },
+        ]),
+      );
+    });
   });
 
   describe('findBySensor', () => {

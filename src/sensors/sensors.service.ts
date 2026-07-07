@@ -358,7 +358,10 @@ export class SensorsService {
 
     const search = query.search?.trim();
     if (search) {
-      preMatch.sensorId = { $regex: search, $options: 'i' };
+      preMatch.sensorId = {
+        $regex: search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+        $options: 'i',
+      };
     }
 
     const pipeline: PipelineStage[] = [];

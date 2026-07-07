@@ -5,11 +5,7 @@ import {
   ApiResourceReadErrors,
 } from '../common/decorators/api-standard-errors.decorator';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
-import {
-  PaginatedResponse,
-  PaginatedSensorDevicesResponseDto,
-  PaginatedSensorReadingsResponseDto,
-} from '../common/dto/paginated-response.dto';
+import { PaginatedSensorDevicesResponseDto, PaginatedSensorReadingsResponseDto } from '../common/dto/paginated-response.dto';
 import { ListSensorDevicesQueryDto } from './dto/list-sensor-devices-query.dto';
 import { SensorsService } from './sensors.service';
 

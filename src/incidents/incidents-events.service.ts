@@ -57,7 +57,7 @@ export class IncidentsEventsService implements OnModuleInit {
     }
 
     this.logger.log(
-      `Incidents integration enabled → ${this.alertsUrl} (min severity: ${this.minSeverity})`,
+      `Incidents integration enabled → ${this.alertsUrl}`,
     );
   }
 

@@ -21,9 +21,11 @@ describe('SensorsService', () => {
   let modelMock: jest.Mock & {
     find: jest.Mock;
     countDocuments: jest.Mock;
+    aggregate: jest.Mock;
   };
   let findMock: jest.Mock;
   let countDocumentsMock: jest.Mock;
+  let aggregateMock: jest.Mock;
 
   const baseReading: CreateSensorReadingDto = {
     sensorId: 'OXI-001',
@@ -50,6 +52,7 @@ describe('SensorsService', () => {
 
     findMock = jest.fn();
     countDocumentsMock = jest.fn();
+    aggregateMock = jest.fn();
 
     alertsService = { create: jest.fn().mockResolvedValue({}) };
     kafkaProducer = { emit: jest.fn().mockResolvedValue({ success: true }) };
@@ -67,7 +70,11 @@ describe('SensorsService', () => {
 
     service = module.get<SensorsService>(SensorsService);
 
-    Object.assign(modelMock, { find: findMock, countDocuments: countDocumentsMock });
+    Object.assign(modelMock, {
+      find: findMock,
+      countDocuments: countDocumentsMock,
+      aggregate: aggregateMock,
+    });
   });
 
   describe('create', () => {
@@ -170,6 +177,65 @@ describe('SensorsService', () => {
         page: 2,
         limit: 10,
         total: 42,
+      });
+    });
+  });
+
+  describe('findDevices', () => {
+    it('returns paginated distinct devices from aggregation', async () => {
+      const devices = [
+        {
+          sensorId: 'OXI-001',
+          assetId: 'PATIENT-001',
+          sensorType: MedicalSensorType.PULSE_OXIMETER,
+          batteryLevel: 85,
+          connectionStatus: ConnectionStatus.CONNECTED,
+          lastReadingAt: new Date('2026-07-04T12:00:00.000Z'),
+        },
+      ];
+
+      aggregateMock.mockResolvedValue([
+        {
+          data: devices,
+          meta: [{ total: 1 }],
+        },
+      ]);
+
+      const result = await service.findDevices({
+        page: 1,
+        limit: 25,
+        search: 'OXI',
+        sensorType: MedicalSensorType.PULSE_OXIMETER,
+      });
+
+      expect(aggregateMock).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          {
+            $match: {
+              sensorType: MedicalSensorType.PULSE_OXIMETER,
+              sensorId: { $regex: 'OXI', $options: 'i' },
+            },
+          },
+        ]),
+      );
+      expect(result).toEqual({
+        data: devices,
+        page: 1,
+        limit: 25,
+        total: 1,
+      });
+    });
+
+    it('returns empty page when no devices match', async () => {
+      aggregateMock.mockResolvedValue([]);
+
+      const result = await service.findDevices({ page: 1, limit: 25 });
+
+      expect(result).toEqual({
+        data: [],
+        page: 1,
+        limit: 25,
+        total: 0,
       });
     });
   });

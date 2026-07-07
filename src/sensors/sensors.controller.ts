@@ -5,7 +5,12 @@ import {
   ApiResourceReadErrors,
 } from '../common/decorators/api-standard-errors.decorator';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
-import { PaginatedSensorReadingsResponseDto } from '../common/dto/paginated-response.dto';
+import {
+  PaginatedResponse,
+  PaginatedSensorDevicesResponseDto,
+  PaginatedSensorReadingsResponseDto,
+} from '../common/dto/paginated-response.dto';
+import { ListSensorDevicesQueryDto } from './dto/list-sensor-devices-query.dto';
 import { SensorsService } from './sensors.service';
 
 @ApiTags('Sensors')
@@ -33,6 +38,23 @@ export class SensorsController {
   @ApiResourceReadErrors()
   findLatest() {
     return this.sensorsService.findLatest();
+  }
+
+  @Get('devices')
+  @ApiOperation({
+    summary: 'Listar dispositivos (sensores) disponibles',
+    description:
+      'Catálogo paginado de sensores distintos con al menos una lectura en P08. ' +
+      'Pensado para integraciones (p. ej. P01) que necesitan seleccionar `sensorId`, `assetId` y `sensorType` al vincular un dispositivo. ' +
+      'Parámetros opcionales: `page`, `limit`, `sensorType`, `search` (coincidencia parcial en sensorId).',
+  })
+  @ApiOkResponse({
+    description: 'Dispositivos ordenados por última lectura recibida',
+    type: PaginatedSensorDevicesResponseDto,
+  })
+  @ApiReadErrors()
+  findDevices(@Query() query: ListSensorDevicesQueryDto) {
+    return this.sensorsService.findDevices(query);
   }
 
   @Get('sensor/:sensorId')

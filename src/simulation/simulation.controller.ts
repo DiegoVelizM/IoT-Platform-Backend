@@ -1,24 +1,21 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
-import { ApiBody, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { ApiBody, ApiOperation, ApiSecurity, ApiTags } from '@nestjs/swagger';
+import { ApiKeyGuard } from '../common/guards/api-key.guard';
+import { GenerateSensorsQueryDto } from './dto/generate-sensors-query.dto';
 import { SimulationService } from './simulation.service';
 import { StartSimulationDto } from './dto/start-simulation.dto';
 
 @ApiTags('Simulation')
+@ApiSecurity('api-key')
+@UseGuards(ApiKeyGuard)
 @Controller('simulation')
 export class SimulationController {
   constructor(private readonly simulationService: SimulationService) {}
 
   @Get('sensors')
   @ApiOperation({ summary: 'Generar sensores simulados' })
-  @ApiQuery({
-    name: 'quantity',
-    required: false,
-    example: 5,
-    description: 'Cantidad de sensores simulados a generar',
-  })
-  generateSensors(@Query('quantity') quantity?: string) {
-    const parsedQuantity = quantity ? Number(quantity) : 5;
-    return this.simulationService.generateSensors(parsedQuantity);
+  generateSensors(@Query() query: GenerateSensorsQueryDto) {
+    return this.simulationService.generateSensors(query.quantity);
   }
 
   @Post('start')

@@ -1,19 +1,21 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { TestEventDto } from './dto/test-event.dto';
 
 @Injectable()
 export class EventsService {
-    testEvent(testEventDto: TestEventDto) {
-        const event = {
-            ...testEventDto,
-            receivedAt: new Date(),
-        };
+  private readonly logger = new Logger(EventsService.name);
 
-        console.log('Evento de prueba recibido:', event);
+  testEvent(testEventDto: TestEventDto) {
+    const event = {
+      ...testEventDto,
+      receivedAt: new Date(),
+    };
 
-        return {
-            message: 'Evento recibido correctamente',
-            event,
-        };
-    }
+    this.logger.log(`Evento de prueba recibido: ${testEventDto.eventId}`);
+
+    return {
+      message: 'Evento recibido correctamente',
+      event,
+    };
+  }
 }

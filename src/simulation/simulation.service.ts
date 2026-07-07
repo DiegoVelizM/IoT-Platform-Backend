@@ -1,11 +1,14 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { SensorsService } from '../sensors/sensors.service';
 import { CreateSensorReadingDto } from 'src/sensors/dto/create-sensor-reading.dto';
-import { SimulatedSensor, SensorType } from './interfaces/simulated-sensor.interface';
+import {
+  SimulatedSensor,
+  SensorType,
+} from './interfaces/simulated-sensor.interface';
 import { StartSimulationDto } from './dto/start-simulation.dto';
 
 @Injectable()
-export class SimulationService {
+export class SimulationService implements OnModuleDestroy {
   private readonly logger = new Logger(SimulationService.name);
   private intervalIds: NodeJS.Timeout[] = [];
 
@@ -81,6 +84,10 @@ export class SimulationService {
     this.intervalIds.forEach((interval) => clearInterval(interval));
     this.intervalIds = [];
     return { message: 'Simulación detenida correctamente' };
+  }
+
+  onModuleDestroy() {
+    this.stopSimulation();
   }
 
   private buildDefaultSensorConfigs(config?: StartSimulationDto) {

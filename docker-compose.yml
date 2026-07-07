@@ -8,7 +8,9 @@ services:
       PORT: 3000
       MONGODB_URI: mongodb://mongo:27017/sensores_db
       KAFKA_BROKER: kafka:9092
-      JWT_SECRET: super_secret_key
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-local-internal-api-key}
+      SIMULATION_API_KEY: ${SIMULATION_API_KEY:-local-simulation-api-key}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
     depends_on:
       mongo:
         condition: service_healthy

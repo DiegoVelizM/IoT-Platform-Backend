@@ -11,6 +11,8 @@ import { EventType } from '../common/events/event-types';
 import { SENSOR_THRESHOLDS } from './constants/sensor-thresholds.constants';
 import { ResourceNotFoundException } from '../common/exceptions/resource-not-found.exception';
 import { OperationWarningDto } from '../common/dto/operation-warning.dto';
+import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
+import { PaginatedResponseDto } from '../common/dto/paginated-response.dto';
 import { KafkaPublishResult } from '../kafka/interfaces/kafka-publish-result.interface';
 import { AnalyticsEventsService } from '../analytics/analytics-events.service';
 import { AnalyticsAlertContext } from '../analytics/interfaces/analytics-alert-context.interface';
@@ -318,8 +320,25 @@ export class SensorsService {
     }
   }
 
-  async findAll() {
-    return this.sensorReadingModel.find().sort({ createdAt: -1 }).exec();
+  async findAll(
+    query: PaginationQueryDto,
+  ): Promise<PaginatedResponseDto<SensorReading>> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 25;
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await Promise.all([
+      this.sensorReadingModel
+        .find()
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean()
+        .exec(),
+      this.sensorReadingModel.countDocuments().exec(),
+    ]);
+
+    return { data, page, limit, total };
   }
 
   async findLatest() {
@@ -335,17 +354,32 @@ export class SensorsService {
     return reading;
   }
 
-  async findBySensor(sensorId: string) {
-    const readings = await this.sensorReadingModel
-      .find({ sensorId })
-      .sort({ createdAt: -1 })
-      .exec();
+  async findBySensor(
+    sensorId: string,
+    query: PaginationQueryDto,
+  ): Promise<PaginatedResponseDto<SensorReading>> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 25;
+    const skip = (page - 1) * limit;
 
-    if (readings.length === 0) {
+    const filter = { sensorId };
+
+    const [data, total] = await Promise.all([
+      this.sensorReadingModel
+        .find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean()
+        .exec(),
+      this.sensorReadingModel.countDocuments(filter).exec(),
+    ]);
+
+    if (total === 0) {
       throw new ResourceNotFoundException('Sensor readings', sensorId);
     }
 
-    return readings;
+    return { data, page, limit, total };
   }
 
   private appendWarnings<T extends object>(

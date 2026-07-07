@@ -26,3 +26,7 @@ export class Alert {
 }
 
 export const AlertSchema = SchemaFactory.createForClass(Alert);
+
+AlertSchema.index({ sensorId: 1, createdAt: -1 });
+AlertSchema.index({ createdAt: -1 });
+AlertSchema.index({ resolved: 1, createdAt: -1 });

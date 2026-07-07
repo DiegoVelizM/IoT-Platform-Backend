@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, PipelineStage } from 'mongoose';
 import { randomUUID } from 'crypto';
 import { CreateSensorReadingDto } from './dto/create-sensor-reading.dto';
 import { SensorReading } from './schemas/sensor-reading.schema';
@@ -13,6 +13,8 @@ import { ResourceNotFoundException } from '../common/exceptions/resource-not-fou
 import { OperationWarningDto } from '../common/dto/operation-warning.dto';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { PaginatedResponse } from '../common/dto/paginated-response.dto';
+import { ListSensorDevicesQueryDto } from './dto/list-sensor-devices-query.dto';
+import { SensorDeviceResponseDto } from './dto/sensor-device-response.dto';
 import { KafkaPublishResult } from '../kafka/interfaces/kafka-publish-result.interface';
 import { AnalyticsEventsService } from '../analytics/analytics-events.service';
 import { AnalyticsAlertContext } from '../analytics/interfaces/analytics-alert-context.interface';
@@ -339,6 +341,68 @@ export class SensorsService {
     ]);
 
     return { data, page, limit, total };
+  }
+
+  async findDevices(
+    query: ListSensorDevicesQueryDto,
+  ): Promise<PaginatedResponse<SensorDeviceResponseDto>> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 25;
+    const skip = (page - 1) * limit;
+
+    const preMatch: Record<string, unknown> = {};
+
+    if (query.sensorType) {
+      preMatch.sensorType = query.sensorType;
+    }
+
+    const search = query.search?.trim();
+    if (search) {
+      preMatch.sensorId = {
+        $regex: search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+        $options: 'i',
+      };
+    }
+
+    const pipeline: PipelineStage[] = [];
+
+    if (Object.keys(preMatch).length > 0) {
+      pipeline.push({ $match: preMatch });
+    }
+
+    pipeline.push(
+      { $sort: { createdAt: -1 } },
+      {
+        $group: {
+          _id: '$sensorId',
+          sensorId: { $first: '$sensorId' },
+          assetId: { $first: '$assetId' },
+          sensorType: { $first: '$sensorType' },
+          batteryLevel: { $first: '$batteryLevel' },
+          connectionStatus: { $first: '$connectionStatus' },
+          lastReadingAt: { $first: '$createdAt' },
+        },
+      },
+      { $sort: { lastReadingAt: -1 } },
+      {
+        $facet: {
+          data: [{ $skip: skip }, { $limit: limit }],
+          meta: [{ $count: 'total' }],
+        },
+      },
+    );
+
+    const [result] = await this.sensorReadingModel.aggregate<{
+      data: SensorDeviceResponseDto[];
+      meta: Array<{ total: number }>;
+    }>(pipeline);
+
+    return {
+      data: result?.data ?? [],
+      page,
+      limit,
+      total: result?.meta?.[0]?.total ?? 0,
+    };
   }
 
   async findLatest() {

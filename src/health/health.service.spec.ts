@@ -1,18 +1,59 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { getConnectionToken } from '@nestjs/mongoose';
 import { HealthService } from './health.service';
+import { KafkaProducerService } from '../kafka/kafka-producer.service';
 
 describe('HealthService', () => {
   let service: HealthService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [HealthService],
+      providers: [
+        HealthService,
+        {
+          provide: getConnectionToken(),
+          useValue: { readyState: 1 },
+        },
+        {
+          provide: KafkaProducerService,
+          useValue: {
+            probeHealth: jest.fn().mockResolvedValue({
+              connected: true,
+              broker: 'kafka:9092',
+            }),
+          },
+        },
+      ],
     }).compile();
 
     service = module.get<HealthService>(HealthService);
   });
 
-  it('should be defined', () => {
-    expect(service).toBeDefined();
+  it('returns ok when mongo and kafka are healthy', async () => {
+    await expect(service.getHealth()).resolves.toMatchObject({
+      status: 'ok',
+      service: 'iot-platform-backend',
+      database: 'connected',
+      kafka: {
+        connected: true,
+        broker: 'kafka:9092',
+      },
+    });
+  });
+
+  it('returns degraded when kafka is disconnected', async () => {
+    const kafkaProducer = service['kafkaProducer'] as KafkaProducerService;
+    jest.spyOn(kafkaProducer, 'probeHealth').mockResolvedValue({
+      connected: false,
+      broker: 'kafka:9092',
+      lastError: 'broker down',
+      lastErrorCode: 'KAFKA_CONNECTION_FAILED',
+    });
+
+    await expect(service.getHealth()).resolves.toMatchObject({
+      status: 'degraded',
+      database: 'connected',
+      kafka: expect.objectContaining({ connected: false }),
+    });
   });
 });

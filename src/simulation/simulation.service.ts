@@ -4,7 +4,7 @@ import {
   ConnectionStatus,
   CreateSensorReadingDto,
   MedicalSensorType,
-} from 'src/sensors/dto/create-sensor-reading.dto';
+} from '../sensors/dto/create-sensor-reading.dto';
 import { SimulatedSensor } from './interfaces/simulated-sensor.interface';
 import {
   MAX_SIMULATION_FREQUENCY_MS,

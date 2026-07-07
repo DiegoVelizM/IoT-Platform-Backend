@@ -29,6 +29,7 @@ export class SensorReading {
 
   @Prop({
     required: true,
+    type: String,
     enum: Object.values(MedicalSensorType),
   })
   sensorType!: MedicalSensorType;
@@ -37,6 +38,7 @@ export class SensorReading {
   batteryLevel?: number;
 
   @Prop({
+    type: String,
     enum: Object.values(ConnectionStatus),
     default: ConnectionStatus.CONNECTED,
   })
@@ -62,6 +64,9 @@ export class SensorReading {
 }
 
 export const SensorReadingSchema = SchemaFactory.createForClass(SensorReading);
+
+SensorReadingSchema.index({ sensorId: 1, createdAt: -1 });
+SensorReadingSchema.index({ createdAt: -1 });
 
 const readingsTtlDays = resolveReadingsTtlDays();
 if (readingsTtlDays > 0) {

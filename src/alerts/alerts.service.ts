@@ -9,6 +9,8 @@ import { KAFKA_TOPICS } from '../kafka/kafka-topics.constants';
 import { EventType } from '../common/events/event-types';
 import { ResourceNotFoundException } from '../common/exceptions/resource-not-found.exception';
 import { OperationWarningDto } from '../common/dto/operation-warning.dto';
+import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
+import { PaginatedResponseDto } from '../common/dto/paginated-response.dto';
 import { KafkaPublishResult } from '../kafka/interfaces/kafka-publish-result.interface';
 import { AnalyticsEventsService } from '../analytics/analytics-events.service';
 import { AnalyticsAlertContext } from '../analytics/interfaces/analytics-alert-context.interface';
@@ -89,21 +91,53 @@ export class AlertsService {
     }
   }
 
-  async findAll() {
-    return this.alertModel.find().sort({ createdAt: -1 }).exec();
+  async findAll(
+    query: PaginationQueryDto,
+  ): Promise<PaginatedResponseDto<Alert>> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 25;
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await Promise.all([
+      this.alertModel
+        .find()
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean()
+        .exec(),
+      this.alertModel.countDocuments().exec(),
+    ]);
+
+    return { data, page, limit, total };
   }
 
-  async findBySensor(sensorId: string) {
-    const alerts = await this.alertModel
-      .find({ sensorId })
-      .sort({ createdAt: -1 })
-      .exec();
+  async findBySensor(
+    sensorId: string,
+    query: PaginationQueryDto,
+  ): Promise<PaginatedResponseDto<Alert>> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 25;
+    const skip = (page - 1) * limit;
 
-    if (alerts.length === 0) {
+    const filter = { sensorId };
+
+    const [data, total] = await Promise.all([
+      this.alertModel
+        .find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean()
+        .exec(),
+      this.alertModel.countDocuments(filter).exec(),
+    ]);
+
+    if (total === 0) {
       throw new ResourceNotFoundException('Alerts', sensorId);
     }
 
-    return alerts;
+    return { data, page, limit, total };
   }
 
   private appendWarnings<T extends object>(

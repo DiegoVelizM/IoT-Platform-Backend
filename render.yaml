@@ -6,7 +6,7 @@ services:
     runtime: docker
     plan: free
     region: oregon
-    healthCheckPath: /
+    healthCheckPath: /health
     envVars:
       - key: MONGODB_URI
         sync: false
@@ -26,6 +26,10 @@ services:
         value: "true"
       - key: SIMULATION_API_KEY
         generateValue: true
+      - key: INTERNAL_API_KEY
+        generateValue: true
+      - key: CORS_ORIGIN
+        sync: false
       - key: SIMULATION_AUTO_START
         value: "true"
       - key: SIMULATION_AUTO_SENSOR_COUNT

@@ -1,4 +1,4 @@
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
@@ -13,7 +13,18 @@ import { OperationWarningDto } from './common/dto/operation-warning.dto';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  app.enableCors();
+  app.enableShutdownHooks();
+
+  const corsOrigins = process.env.CORS_ORIGIN?.split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  if (corsOrigins && corsOrigins.length > 0) {
+    app.enableCors({ origin: corsOrigins });
+  } else {
+    app.enableCors();
+  }
+
   app.useGlobalFilters(new HttpExceptionFilter());
 
   app.useGlobalPipes(
@@ -47,4 +58,10 @@ async function bootstrap() {
   await app.listen(process.env.PORT ?? 3000);
 }
 
-bootstrap();
+bootstrap().catch((error: unknown) => {
+  Logger.error(
+    error instanceof Error ? error.stack : String(error),
+    'Bootstrap',
+  );
+  process.exit(1);
+});

@@ -66,17 +66,33 @@ cd IoT-Platform-Backend
 
 ### 3. Crear archivo `.env`
 
-Crear un archivo `.env` en la raíz del proyecto:
+Copiar la plantilla y ajustar valores:
+
+```bash
+cp .env.example .env
+```
+
+Variables mínimas para Docker local:
 
 ```env
 PORT=3000
 MONGODB_URI=mongodb://mongo:27017/sensores_db
 KAFKA_BROKER=kafka:9092
-JWT_SECRET=super_secret_key
+INTERNAL_API_KEY=local-internal-api-key
+SIMULATION_API_KEY=local-simulation-api-key
+CORS_ORIGIN=http://localhost:3000
 READINGS_TTL_DAYS=7
 ```
 
+| Variable | Efecto |
+|----------|--------|
+| `CORS_ORIGIN` | Orígenes permitidos (separados por coma). Si no se define, CORS abierto (solo recomendado en local) |
+| `INTERNAL_API_KEY` | Protege `POST /alerts` manual (header `X-Internal-Api-Key`). Las alertas automáticas por telemetría no lo requieren |
+| `SIMULATION_API_KEY` | Protege `POST /simulation/start` y `/stop` (header `X-Simulation-Key`) |
+
 **Retención de lecturas (MongoDB TTL):** por defecto las lecturas en `sensorreadings` expiran a los **7 días** (`createdAt`). MongoDB las elimina en background. `READINGS_TTL_DAYS=0` desactiva el TTL (útil en pruebas de escala). No afecta alertas ni lo que P09 almacene por su cuenta.
+
+**Paginación:** `GET /sensors`, `GET /sensors/sensor/:id`, `GET /alerts` y `GET /alerts/sensor/:id` aceptan `?page=1&limit=25` (máx `limit=100`).
 
 **Kafka local (Docker):** solo `KAFKA_BROKER=kafka:9092` — sin usuario ni contraseña.
 

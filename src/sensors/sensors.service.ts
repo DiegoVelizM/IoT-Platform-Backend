@@ -371,7 +371,8 @@ export class SensorsService {
     }
 
     pipeline.push(
-      { $sort: { createdAt: -1 } },
+      // Orden por sensorId + createdAt usa el índice compuesto; $first queda en la lectura más reciente por sensor.
+      { $sort: { sensorId: 1, createdAt: -1 } },
       {
         $group: {
           _id: '$sensorId',

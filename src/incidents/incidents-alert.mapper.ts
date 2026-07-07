@@ -35,3 +35,24 @@ export function mapAlertToIncidentsEnvelope(
     payload,
   };
 }
+
+export function mapAlertResolvedToIncidentsEnvelope(
+  sensorId: string,
+  alertType: string,
+  systemId: string = DEFAULT_SYSTEM_ID,
+): IncidentsAlertEnvelope {
+  const occurredAt = new Date().toISOString();
+
+  return {
+    sistema_id: systemId,
+    creado_en: occurredAt,
+    payload: {
+      eventId: randomUUID(),
+      eventType: EventType.ALERT_RESOLVED,
+      occurredAt,
+      source: DEFAULT_SOURCE,
+      sensorId,
+      alertType,
+    },
+  };
+}

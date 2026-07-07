@@ -54,7 +54,10 @@ describe('SensorsService', () => {
     countDocumentsMock = jest.fn();
     aggregateMock = jest.fn();
 
-    alertsService = { create: jest.fn().mockResolvedValue({}) };
+    alertsService = {
+      create: jest.fn().mockResolvedValue({}),
+      resolveOpenAlert: jest.fn().mockResolvedValue(undefined),
+    };
     kafkaProducer = { emit: jest.fn().mockResolvedValue({ success: true }) };
     analyticsEventsService = { publishTelemetry: jest.fn() };
 
@@ -78,7 +81,7 @@ describe('SensorsService', () => {
   });
 
   describe('create', () => {
-    it('persists reading, publishes telemetry and skips battery alert when level is healthy', async () => {
+    it('persists reading, publishes telemetry and resolves battery alert when level is healthy', async () => {
       await service.create(baseReading);
 
       expect(modelMock).toHaveBeenCalled();
@@ -88,6 +91,10 @@ describe('SensorsService', () => {
       );
       expect(analyticsEventsService.publishTelemetry).toHaveBeenCalled();
       expect(alertsService.create).not.toHaveBeenCalled();
+      expect(alertsService.resolveOpenAlert).toHaveBeenCalledWith(
+        'OXI-001',
+        'low_battery',
+      );
     });
 
     it('creates warning alert when battery is below LOW threshold', async () => {
@@ -134,6 +141,15 @@ describe('SensorsService', () => {
           sensorId: 'OXI-001',
           connectionStatus: ConnectionStatus.OFFLINE,
         }),
+      );
+    });
+
+    it('resolves sensor_offline alert when connection returns to connected', async () => {
+      await service.create(baseReading);
+
+      expect(alertsService.resolveOpenAlert).toHaveBeenCalledWith(
+        'OXI-001',
+        'sensor_offline',
       );
     });
 

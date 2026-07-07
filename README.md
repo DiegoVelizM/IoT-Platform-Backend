@@ -207,6 +207,23 @@ Payload enviado a P11 (formato camelCase plano dentro del envelope de P11):
 
 > P11 exige `sistema_id` en la raíz; el evento va dentro de `payload`. También aceptan el formato snake_case anidado de P09, pero usamos camelCase plano por alineación con Kafka interno.
 
+**Cierre de incidentes (recuperación):** cuando la telemetría vuelve a la normalidad, P08 marca la alerta como `resolved: true` en MongoDB y envía el mismo `POST` con `eventType: "alert_resolved"` y solo `sensorId` + `alertType`. P11 correlaciona con el incidente activo del sensor y lo pasa a CERRADO.
+
+```json
+{
+  "sistema_id": "P08",
+  "creado_en": "2026-07-04T14:00:00.000Z",
+  "payload": {
+    "eventId": "...",
+    "eventType": "alert_resolved",
+    "occurredAt": "2026-07-04T14:00:00.000Z",
+    "source": "iot-platform",
+    "sensorId": "OXI-001",
+    "alertType": "sensor_offline"
+  }
+}
+```
+
 > `JWT_SECRET` está preparado para futura autenticación; actualmente no se utiliza.
 
 ### 4. Crear volumen de MongoDB (solo Docker)

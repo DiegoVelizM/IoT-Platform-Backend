@@ -3,6 +3,8 @@ export enum EventType {
 
   ALERT_GENERATED = 'alert_generated',
 
+  ALERT_RESOLVED = 'alert_resolved',
+
   SENSOR_OFFLINE = 'sensor_offline',
 
   LOW_BATTERY = 'low_battery',

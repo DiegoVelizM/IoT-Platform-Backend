@@ -7,7 +7,8 @@ import {
   parseHttpFetchError,
   parseHttpStatusError,
 } from '../common/utils/http-fetch-error.util';
-import { mapAlertToIncidentsEnvelope } from './incidents-alert.mapper';
+import { EventType } from '../common/events/event-types';
+import { mapAlertToIncidentsEnvelope, mapAlertResolvedToIncidentsEnvelope } from './incidents-alert.mapper';
 import { IncidentsPublishResult } from './interfaces/incidents-publish-result.interface';
 
 const DEFAULT_SYSTEM_ID = 'P08';
@@ -69,7 +70,7 @@ export class IncidentsEventsService implements OnModuleInit {
       return;
     }
 
-    if (this.minSeverity === 'critical' && alert.severity !== 'critical') {
+    if (!this.shouldPublishToIncidents(alert.severity)) {
       this.logger.debug(
         `Skipping incidents alert for sensor ${alert.sensorId}: severity ${alert.severity} below threshold`,
       );
@@ -83,6 +84,37 @@ export class IncidentsEventsService implements OnModuleInit {
     );
 
     void this.sendEnvelope(envelope);
+  }
+
+  publishResolved(sensorId: string, alertType: string, severity: string): void {
+    if (!this.enabled) {
+      return;
+    }
+
+    if (!this.shouldPublishToIncidents(severity)) {
+      this.logger.debug(
+        `Skipping incidents resolve for sensor ${sensorId}: severity ${severity} below threshold`,
+      );
+      return;
+    }
+
+    const envelope = mapAlertResolvedToIncidentsEnvelope(
+      sensorId,
+      alertType,
+      this.systemId,
+    );
+
+    this.logger.log(
+      `Notifying P11 of alert resolution: sensor=${sensorId} alertType=${alertType}`,
+    );
+
+    void this.sendEnvelope(envelope);
+  }
+
+  private shouldPublishToIncidents(severity: string): boolean {
+    return !(
+      this.minSeverity === 'critical' && severity !== 'critical'
+    );
   }
 
   private async sendEnvelope(
@@ -107,7 +139,7 @@ export class IncidentsEventsService implements OnModuleInit {
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       try {
         this.logger.log(
-          `Sending alert to incidents API (attempt ${attempt + 1}/${MAX_RETRIES + 1}) sensor=${envelope.payload.sensorId}`,
+          `Sending ${envelope.payload.eventType} to incidents API (attempt ${attempt + 1}/${MAX_RETRIES + 1}) sensor=${envelope.payload.sensorId}`,
         );
 
         const response = await fetch(this.alertsUrl, {
@@ -117,9 +149,15 @@ export class IncidentsEventsService implements OnModuleInit {
         });
 
         if (response.ok) {
-          this.logger.log(
-            `Incidents alert acknowledged for sensor ${envelope.payload.sensorId}`,
-          );
+          if (envelope.payload.eventType === EventType.ALERT_RESOLVED) {
+            this.logger.log(
+              `Incidents alert_resolved acknowledged for sensor=${envelope.payload.sensorId} alertType=${envelope.payload.alertType}`,
+            );
+          } else {
+            this.logger.log(
+              `Incidents alert_generated acknowledged for sensor=${envelope.payload.sensorId} alertType=${envelope.payload.alertType}`,
+            );
+          }
 
           return { success: true };
         }

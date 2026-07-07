@@ -10,7 +10,7 @@ import { EventType } from '../common/events/event-types';
 import { ResourceNotFoundException } from '../common/exceptions/resource-not-found.exception';
 import { OperationWarningDto } from '../common/dto/operation-warning.dto';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
-import { PaginatedResponseDto } from '../common/dto/paginated-response.dto';
+import { PaginatedResponse } from '../common/dto/paginated-response.dto';
 import { KafkaPublishResult } from '../kafka/interfaces/kafka-publish-result.interface';
 import { AnalyticsEventsService } from '../analytics/analytics-events.service';
 import { AnalyticsAlertContext } from '../analytics/interfaces/analytics-alert-context.interface';
@@ -93,7 +93,7 @@ export class AlertsService {
 
   async findAll(
     query: PaginationQueryDto,
-  ): Promise<PaginatedResponseDto<Alert>> {
+  ): Promise<PaginatedResponse<Alert>> {
     const page = query.page ?? 1;
     const limit = query.limit ?? 25;
     const skip = (page - 1) * limit;
@@ -115,7 +115,7 @@ export class AlertsService {
   async findBySensor(
     sensorId: string,
     query: PaginationQueryDto,
-  ): Promise<PaginatedResponseDto<Alert>> {
+  ): Promise<PaginatedResponse<Alert>> {
     const page = query.page ?? 1;
     const limit = query.limit ?? 25;
     const skip = (page - 1) * limit;

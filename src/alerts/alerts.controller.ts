@@ -12,7 +12,7 @@ import {
 } from '../common/decorators/api-standard-errors.decorator';
 import { InternalApiKeyGuard } from '../common/guards/internal-api-key.guard';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
-import { PaginatedResponseDto } from '../common/dto/paginated-response.dto';
+import { PaginatedAlertsResponseDto } from '../common/dto/paginated-response.dto';
 import { ApiInternalKeyRequired } from './decorators/api-internal-key.decorator';
 import { AlertsService } from './alerts.service';
 import { CreateAlertDto } from './dto/create-alert.dto';
@@ -48,7 +48,7 @@ export class AlertsController {
   })
   @ApiOkResponse({
     description: 'Alertas paginadas ordenadas por fecha de creación',
-    type: PaginatedResponseDto,
+    type: PaginatedAlertsResponseDto,
   })
   @ApiReadErrors()
   findAll(@Query() query: PaginationQueryDto) {
@@ -62,7 +62,7 @@ export class AlertsController {
   })
   @ApiOkResponse({
     description: 'Alertas del sensor indicado',
-    type: PaginatedResponseDto,
+    type: PaginatedAlertsResponseDto,
   })
   @ApiResourceReadErrors()
   findBySensor(

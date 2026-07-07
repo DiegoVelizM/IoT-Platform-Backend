@@ -12,7 +12,7 @@ import { SENSOR_THRESHOLDS } from './constants/sensor-thresholds.constants';
 import { ResourceNotFoundException } from '../common/exceptions/resource-not-found.exception';
 import { OperationWarningDto } from '../common/dto/operation-warning.dto';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
-import { PaginatedResponseDto } from '../common/dto/paginated-response.dto';
+import { PaginatedResponse } from '../common/dto/paginated-response.dto';
 import { KafkaPublishResult } from '../kafka/interfaces/kafka-publish-result.interface';
 import { AnalyticsEventsService } from '../analytics/analytics-events.service';
 import { AnalyticsAlertContext } from '../analytics/interfaces/analytics-alert-context.interface';
@@ -322,7 +322,7 @@ export class SensorsService {
 
   async findAll(
     query: PaginationQueryDto,
-  ): Promise<PaginatedResponseDto<SensorReading>> {
+  ): Promise<PaginatedResponse<SensorReading>> {
     const page = query.page ?? 1;
     const limit = query.limit ?? 25;
     const skip = (page - 1) * limit;
@@ -357,7 +357,7 @@ export class SensorsService {
   async findBySensor(
     sensorId: string,
     query: PaginationQueryDto,
-  ): Promise<PaginatedResponseDto<SensorReading>> {
+  ): Promise<PaginatedResponse<SensorReading>> {
     const page = query.page ?? 1;
     const limit = query.limit ?? 25;
     const skip = (page - 1) * limit;

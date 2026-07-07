@@ -45,6 +45,6 @@ services:
       - key: INCIDENTS_SYSTEM_ID
         value: P08
       - key: INCIDENTS_MIN_SEVERITY
-        value: critical
+        value: warning
       - key: INCIDENTS_ALERTS_ENABLED
         value: "true"

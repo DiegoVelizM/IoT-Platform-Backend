@@ -5,7 +5,7 @@ import {
   ApiResourceReadErrors,
 } from '../common/decorators/api-standard-errors.decorator';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
-import { PaginatedResponseDto } from '../common/dto/paginated-response.dto';
+import { PaginatedSensorReadingsResponseDto } from '../common/dto/paginated-response.dto';
 import { SensorsService } from './sensors.service';
 
 @ApiTags('Sensors')
@@ -20,7 +20,7 @@ export class SensorsController {
   })
   @ApiOkResponse({
     description: 'Lecturas paginadas ordenadas por fecha de creación',
-    type: PaginatedResponseDto,
+    type: PaginatedSensorReadingsResponseDto,
   })
   @ApiReadErrors()
   findAll(@Query() query: PaginationQueryDto) {
@@ -42,7 +42,7 @@ export class SensorsController {
   })
   @ApiOkResponse({
     description: 'Lecturas del sensor indicado',
-    type: PaginatedResponseDto,
+    type: PaginatedSensorReadingsResponseDto,
   })
   @ApiResourceReadErrors()
   findBySensor(

@@ -18,7 +18,10 @@ import { IncidentsModule } from './incidents/incidents.module';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-    MongooseModule.forRoot(process.env.MONGODB_URI ?? 'mongodb://localhost:27017/sensores_db'),
+    MongooseModule.forRoot(process.env.MONGODB_URI ?? 'mongodb://localhost:27017/sensores_db', {
+      serverSelectionTimeoutMS: 5_000,
+      socketTimeoutMS: 10_000,
+    }),
     SensorsModule,
     TelemetryModule,
     HealthModule,

@@ -17,8 +17,9 @@ Este proyecto corresponde al backend de una plataforma IoT para monitoreo de ins
 - Simulación automática de sensores médicos
 - Generación automática de alertas según umbrales configurables
 - Publicación de eventos con Kafka (productor)
+- Consumo de eventos Kafka internos (consumidor en el mismo proceso)
 - Docker y Docker Compose (backend, MongoDB, Kafka, Zookeeper)
-- Health check con verificación de conexión a MongoDB
+- Health check con verificación de conexión a MongoDB y estado Kafka (productor + consumidor)
 
 ---
 
@@ -95,6 +96,13 @@ READINGS_TTL_DAYS=7
 **Paginación:** `GET /sensors`, `GET /sensors/sensor/:id`, `GET /alerts` y `GET /alerts/sensor/:id` aceptan `?page=1&limit=25` (máx `limit=100`).
 
 **Kafka local (Docker):** solo `KAFKA_BROKER=kafka:9092` — sin usuario ni contraseña.
+
+Opcional:
+
+```env
+KAFKA_CLIENT_ID=iot-platform-backend
+KAFKA_CONSUMER_GROUP_ID=iot-platform-consumer
+```
 
 **Kafka en la nube (Render + Confluent Cloud):** además del broker, configurar credenciales SASL/SSL:
 
@@ -513,7 +521,11 @@ Ejemplo de body:
 GET /health
 ```
 
-Verifica disponibilidad del backend, MongoDB y Kafka. Ejecuta un **probe activo** contra el broker Kafka en cada consulta (no usa solo el último estado cacheado).
+Verifica disponibilidad del backend, MongoDB y Kafka. Ejecuta un **probe activo** del productor contra el broker en cada consulta (`listTopics`); el estado del **consumidor** se reporta desde memoria (`kafka.consumer`).
+
+- `kafka.connected` → productor (publicar eventos). Si falla junto con MongoDB, `status` pasa a `degraded`.
+- `kafka.consumer.connected` → consumidor escuchando topics. **Informativo**: la API sigue operativa aunque el consumer esté caído; sirve para validar el ciclo event-driven en demo.
+- `kafka.consumer.messagesConsumed` → contador desde el arranque del proceso.
 
 ---
 
@@ -559,19 +571,29 @@ Sensores simulados / POST /telemetry
   → MongoDB (sensorreadings)
   → Evaluación de umbrales → AlertsService → MongoDB (alerts)
   → KafkaProducerService → topics Kafka
+       ↓
+  KafkaConsumerService (log / contador; no re-guarda en Mongo ni reenvía a P09)
   → AnalyticsEventsService → HTTP P09 (dashboards y tendencias)
   → IncidentsEventsService → HTTP P11 (solo alertas critical)
 ```
 
 P08 expone datos vía API (`GET /sensors/*`) para **P01** y eventos HTTP para **P09** (visualización) y **P11** (incidentes críticos). No implementamos paneles propios.
 
-Topics Kafka publicados:
+Topics Kafka publicados y consumidos internamente:
 
 | Topic | Descripción |
 |-------|-------------|
 | `telemetry_received` | Nueva lectura procesada |
 | `alert_generated` | Alerta creada |
 | `sensor_offline` | Sensor reportado como offline |
+
+Tras `POST /telemetry` en Docker deberías ver en logs del backend:
+
+```txt
+Message sent to topic telemetry_received
+Consumed telemetry_received [partition 0] sensor=OXI-001 event=telemetry_received total=1
+```
+
 
 ---
 
@@ -697,7 +719,7 @@ Todos los endpoints REST devuelven errores con el siguiente **formato estandariz
 
 **GET /health — MongoDB o Kafka desconectados:**
 
-Responde `200 OK` con `status: "degraded"`. Kafka se verifica en tiempo real con un probe activo (`listTopics`); si el broker está disponible, reconecta el productor automáticamente:
+Responde `200 OK` con `status: "degraded"`. Kafka productor se verifica en tiempo real; si el broker está disponible, reconecta el productor automáticamente:
 
 ```json
 {
@@ -708,7 +730,12 @@ Responde `200 OK` con `status: "degraded"`. Kafka se verifica en tiempo real con
     "connected": false,
     "broker": "kafka:9092",
     "lastError": "Connection error",
-    "lastErrorCode": "KAFKA_CONNECTION_FAILED"
+    "lastErrorCode": "KAFKA_CONNECTION_FAILED",
+    "consumer": {
+      "connected": true,
+      "groupId": "iot-platform-consumer",
+      "messagesConsumed": 12
+    }
   },
   "timestamp": "2026-06-27T12:00:00.000Z"
 }
@@ -738,13 +765,13 @@ Responde `201` con warnings opcionales:
 
 ## Documentación de errores Kafka
 
-El productor Kafka (`KafkaProducerService`) opera de forma **no bloqueante** respecto a la API REST: un fallo de Kafka **no impide** que la telemetría o las alertas se guarden en MongoDB. Los fallos se reportan mediante códigos estandarizados (`KAFKA_CONNECTION_FAILED`, `KAFKA_PUBLISH_FAILED`) en el array `warnings` de las respuestas de escritura y en el endpoint `/health`.
+El productor Kafka (`KafkaProducerService`) y el consumidor (`KafkaConsumerService`) operan de forma **no bloqueante** respecto a la API REST: un fallo de Kafka **no impide** que la telemetría o las alertas se guarden en MongoDB. Los fallos del productor se reportan mediante códigos estandarizados (`KAFKA_CONNECTION_FAILED`, `KAFKA_PUBLISH_FAILED`) en el array `warnings` de las respuestas de escritura y en `/health`. El consumidor expone su estado en `kafka.consumer` sin afectar el `status` general salvo que también falle el productor.
 
 ### Escenarios de error
 
 | Escenario | Comportamiento de la API | Log del servidor |
 |-----------|--------------------------|------------------|
-| Broker no disponible al iniciar | La app arranca igualmente; Kafka queda desconectado | `Kafka connect error` |
+| Broker no disponible al iniciar | La app arranca igualmente; productor y/o consumidor quedan desconectados | `Kafka connect error` / `Kafka consumer connection error` |
 | Fallo al publicar evento | La operación HTTP termina con éxito (201/200) y `warnings` en el body | `Failed to send message to topic <topic>` |
 | Productor desconectado al emitir | Intenta reconectar automáticamente antes de enviar | `Kafka producer disconnected. Reconnecting...` |
 | Reconexión exitosa | El evento se publica normalmente | `Message sent to topic <topic>` |
@@ -772,14 +799,17 @@ docker logs iot_backend 2>&1 | grep -i kafka
 
 Mensajes clave:
 
-- `Connected to Kafka broker kafka:9092` — conexión OK al arrancar
-- `Kafka connect error` — broker inaccesible al iniciar
+- `Connected to Kafka (local) at kafka:9092` — productor OK al arrancar
+- `Consumed telemetry_received [partition 0] sensor=...` — consumidor procesó un evento
+- `Kafka connect error` — broker inaccesible al iniciar productor
+- `Kafka consumer connection error` — broker inaccesible al iniciar consumidor
 - `Failed to send message to topic` — publicación fallida (datos ya persistidos en MongoDB)
 
 ### Variable de entorno
 
 ```env
 KAFKA_BROKER=kafka:9092
+KAFKA_CONSUMER_GROUP_ID=iot-platform-consumer
 ```
 
 Si el broker es incorrecto o inalcanzable, la API sigue operativa pero los eventos no se distribuyen hasta que Kafka esté disponible.
@@ -797,6 +827,7 @@ Proyecto académico en desarrollo activo. Documentación detallada del equipo: [
 - Persistencia en MongoDB
 - Generación automática de alertas por umbrales
 - Productor Kafka con publicación de eventos
+- Consumidor Kafka interno (`KafkaConsumerService`) con logs y contador
 - Integración HTTP con P09 (analítica / dashboards)
 - Integración HTTP con P11 (incidentes, solo alertas `critical`)
 - Estandarización de errores HTTP 400/404/500 con `HttpExceptionFilter`
@@ -809,7 +840,6 @@ Proyecto académico en desarrollo activo. Documentación detallada del equipo: [
 
 **Pendiente / en progreso:**
 
-- Consumidor Kafka (`docs/KAFKA-CONSUMER.md` — otro compañero)
 - Evidencia documentada de prueba 1.000 sensores (Mongo + consumer)
 - Retención y agregación de datos (requisito del enunciado) — **TTL lecturas 7 días** implementado; agregación mínima pendiente
 - Integración P06 notificaciones (otro compañero)

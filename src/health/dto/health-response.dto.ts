@@ -1,8 +1,40 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ErrorCode } from '../../common/errors/error-codes';
 
+class KafkaConsumerHealthDto {
+  @ApiProperty({
+    example: true,
+    description: 'Estado de la conexión del consumidor Kafka',
+  })
+  connected!: boolean;
+
+  @ApiProperty({ example: 'iot-platform-consumer' })
+  groupId!: string;
+
+  @ApiProperty({
+    example: 42,
+    description: 'Mensajes consumidos desde el arranque del proceso',
+  })
+  messagesConsumed!: number;
+
+  @ApiPropertyOptional({
+    example: 'Connection refused',
+    description: 'Último error registrado del consumidor Kafka',
+  })
+  lastError?: string;
+
+  @ApiPropertyOptional({
+    enum: [ErrorCode.KAFKA_CONNECTION_FAILED],
+    example: ErrorCode.KAFKA_CONNECTION_FAILED,
+  })
+  lastErrorCode?: ErrorCode.KAFKA_CONNECTION_FAILED;
+}
+
 class KafkaHealthDto {
-  @ApiProperty({ example: true })
+  @ApiProperty({
+    example: true,
+    description: 'Estado de la conexión del productor Kafka',
+  })
   connected!: boolean;
 
   @ApiProperty({ example: 'kafka:9092' })
@@ -26,6 +58,9 @@ class KafkaHealthDto {
     example: ErrorCode.KAFKA_CONNECTION_FAILED,
   })
   lastErrorCode?: ErrorCode.KAFKA_CONNECTION_FAILED | ErrorCode.KAFKA_PUBLISH_FAILED;
+
+  @ApiProperty({ type: KafkaConsumerHealthDto })
+  consumer!: KafkaConsumerHealthDto;
 }
 
 export class HealthResponseDto {

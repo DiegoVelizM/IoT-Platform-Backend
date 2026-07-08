@@ -10,14 +10,19 @@ import { ResourceNotFoundException } from '../common/exceptions/resource-not-fou
 describe('AlertsService', () => {
   let service: AlertsService;
   let findMock: jest.Mock;
+  let findOneMock: jest.Mock;
   let countDocumentsMock: jest.Mock;
+  let kafkaEmitMock: jest.Mock;
 
   beforeEach(async () => {
     findMock = jest.fn();
+    findOneMock = jest.fn();
     countDocumentsMock = jest.fn();
+    kafkaEmitMock = jest.fn().mockResolvedValue({ success: true });
 
     const alertModel = Object.assign(jest.fn(), {
       find: findMock,
+      findOne: findOneMock,
       countDocuments: countDocumentsMock,
     });
 
@@ -27,7 +32,7 @@ describe('AlertsService', () => {
         { provide: getModelToken(Alert.name), useValue: alertModel },
         {
           provide: KafkaProducerService,
-          useValue: { emit: jest.fn().mockResolvedValue({ success: true }) },
+          useValue: { emit: kafkaEmitMock },
         },
         {
           provide: AnalyticsEventsService,
@@ -41,6 +46,38 @@ describe('AlertsService', () => {
     }).compile();
 
     service = module.get<AlertsService>(AlertsService);
+  });
+
+  describe('create', () => {
+    it('skips creation when an active alert of the same type already exists', async () => {
+      const existingAlert = {
+        sensorId: 'OXI-001',
+        type: 'low_battery',
+        severity: 'warning',
+        resolved: false,
+        toObject: () => ({
+          sensorId: 'OXI-001',
+          type: 'low_battery',
+          severity: 'warning',
+          resolved: false,
+        }),
+      };
+
+      findOneMock.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(existingAlert),
+      });
+
+      const result = await service.create({
+        sensorId: 'OXI-001',
+        type: 'low_battery',
+        severity: 'warning',
+        message: 'Battery level is low: 15%',
+        resolved: false,
+      });
+
+      expect(result).toEqual(existingAlert.toObject());
+      expect(kafkaEmitMock).not.toHaveBeenCalled();
+    });
   });
 
   describe('findAll', () => {

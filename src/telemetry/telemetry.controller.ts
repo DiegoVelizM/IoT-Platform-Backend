@@ -1,8 +1,10 @@
-import { Body, Controller, Logger, Post } from '@nestjs/common';
+import { Body, Controller, Logger, Post, UseGuards } from '@nestjs/common';
 import { ApiBody, ApiCreatedResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ApiWriteErrors } from '../common/decorators/api-standard-errors.decorator';
 import { CreateSensorReadingDto } from '../sensors/dto/create-sensor-reading.dto';
 import { SensorsService } from '../sensors/sensors.service';
+import { TelemetryApiKeyGuard } from './guards/telemetry-api-key.guard';
+import { ApiTelemetryKeyRequired } from './decorators/api-telemetry-key.decorator';
 
 @ApiTags('Telemetry')
 @Controller('telemetry')
@@ -12,6 +14,8 @@ export class TelemetryController {
   constructor(private readonly sensorsService: SensorsService) {}
 
   @Post()
+  @UseGuards(TelemetryApiKeyGuard)
+  @ApiTelemetryKeyRequired()
   @ApiBody({
     type: CreateSensorReadingDto,
     examples: {

@@ -33,6 +33,21 @@ export class AlertsService {
     analyticsContext?: AnalyticsAlertContext,
   ) {
     try {
+      const existingActive = await this.alertModel
+        .findOne({
+          sensorId: createAlertDto.sensorId,
+          type: createAlertDto.type,
+          resolved: false,
+        })
+        .exec();
+
+      if (existingActive) {
+        this.logger.debug(
+          `Skipping duplicate active alert ${createAlertDto.type} for sensor ${createAlertDto.sensorId}`,
+        );
+        return existingActive.toObject();
+      }
+
       const alert = new this.alertModel(createAlertDto);
       const savedAlert = await alert.save();
 
@@ -62,6 +77,23 @@ export class AlertsService {
 
       return this.appendWarnings(savedAlert.toObject(), [publishResult]);
     } catch (error) {
+      if (this.isDuplicateActiveAlertError(error)) {
+        const existingActive = await this.alertModel
+          .findOne({
+            sensorId: createAlertDto.sensorId,
+            type: createAlertDto.type,
+            resolved: false,
+          })
+          .exec();
+
+        if (existingActive) {
+          this.logger.debug(
+            `Recovered duplicate active alert ${createAlertDto.type} for sensor ${createAlertDto.sensorId}`,
+          );
+          return existingActive.toObject();
+        }
+      }
+
       this.logger.error(
         'Failed to create and publish alert',
         error instanceof Error ? error.stack : String(error),
@@ -138,6 +170,15 @@ export class AlertsService {
     }
 
     return { data, page, limit, total };
+  }
+
+  private isDuplicateActiveAlertError(error: unknown): boolean {
+    return (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      (error as { code: unknown }).code === 11_000
+    );
   }
 
   private appendWarnings<T extends object>(

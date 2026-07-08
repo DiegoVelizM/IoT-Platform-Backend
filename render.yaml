@@ -26,6 +26,8 @@ services:
         value: "true"
       - key: SIMULATION_API_KEY
         generateValue: true
+      - key: TELEMETRY_API_KEY
+        generateValue: true
       - key: INTERNAL_API_KEY
         generateValue: true
       - key: CORS_ORIGIN

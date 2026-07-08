@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Request } from 'express';
 import { ErrorCode } from '../errors/error-codes';
+import { isValidApiKey } from '../utils/api-key.util';
 
 export const INTERNAL_API_KEY_HEADER = 'x-internal-api-key';
 
@@ -26,7 +27,7 @@ export class InternalApiKeyGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<Request>();
     const providedKey = request.headers[INTERNAL_API_KEY_HEADER];
 
-    if (typeof providedKey !== 'string' || providedKey !== expectedKey) {
+    if (!isValidApiKey(providedKey, expectedKey)) {
       throw new UnauthorizedException({
         error: ErrorCode.INTERNAL_API_UNAUTHORIZED,
         message:

@@ -19,12 +19,12 @@ import { CreateAlertDto } from './dto/create-alert.dto';
 
 @ApiTags('Alerts')
 @Controller('alerts')
+@UseGuards(InternalApiKeyGuard)
+@ApiInternalKeyRequired()
 export class AlertsController {
   constructor(private readonly alertsService: AlertsService) {}
 
   @Post()
-  @UseGuards(InternalApiKeyGuard)
-  @ApiInternalKeyRequired()
   @ApiOperation({
     summary: 'Crear alerta manualmente',
     description:

@@ -5,6 +5,8 @@ import { SimulationService } from './simulation.service';
 import { StartSimulationDto } from './dto/start-simulation.dto';
 import { SimulationApiKeyGuard } from './guards/simulation-api-key.guard';
 import { ApiSimulationKeyRequired } from './decorators/api-simulation-key.decorator';
+import { InternalApiKeyGuard } from '../common/guards/internal-api-key.guard';
+import { ApiInternalKeyRequired } from '../alerts/decorators/api-internal-key.decorator';
 
 @ApiTags('Simulation')
 @Controller('simulation')
@@ -12,6 +14,8 @@ export class SimulationController {
   constructor(private readonly simulationService: SimulationService) {}
 
   @Get('sensors')
+  @UseGuards(InternalApiKeyGuard)
+  @ApiInternalKeyRequired()
   @ApiOperation({ summary: 'Generar sensores simulados' })
   @ApiOkResponse({ description: 'Lista de sensores médicos simulados predefinidos' })
   @ApiReadErrors()

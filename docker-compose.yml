@@ -8,8 +8,9 @@ services:
       PORT: 3000
       MONGODB_URI: mongodb://mongo:27017/sensores_db
       KAFKA_BROKER: kafka:9092
-      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-local-internal-api-key}
-      SIMULATION_API_KEY: ${SIMULATION_API_KEY:-local-simulation-api-key}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      TELEMETRY_API_KEY: ${TELEMETRY_API_KEY}
+      SIMULATION_API_KEY: ${SIMULATION_API_KEY}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
     depends_on:
       mongo:

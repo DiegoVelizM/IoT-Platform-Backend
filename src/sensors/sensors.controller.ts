@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiReadErrors,
@@ -8,9 +8,13 @@ import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { PaginatedSensorDevicesResponseDto, PaginatedSensorReadingsResponseDto } from '../common/dto/paginated-response.dto';
 import { ListSensorDevicesQueryDto } from './dto/list-sensor-devices-query.dto';
 import { SensorsService } from './sensors.service';
+import { InternalApiKeyGuard } from '../common/guards/internal-api-key.guard';
+import { ApiInternalKeyRequired } from '../alerts/decorators/api-internal-key.decorator';
 
 @ApiTags('Sensors')
 @Controller('sensors')
+@UseGuards(InternalApiKeyGuard)
+@ApiInternalKeyRequired()
 export class SensorsController {
   constructor(private readonly sensorsService: SensorsService) {}
 

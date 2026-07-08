@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Request } from 'express';
 import { ErrorCode } from '../../common/errors/error-codes';
+import { isValidApiKey } from '../../common/utils/api-key.util';
 
 export const SIMULATION_API_KEY_HEADER = 'x-simulation-key';
 
@@ -26,7 +27,7 @@ export class SimulationApiKeyGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<Request>();
     const providedKey = request.headers[SIMULATION_API_KEY_HEADER];
 
-    if (typeof providedKey !== 'string' || providedKey !== expectedKey) {
+    if (!isValidApiKey(providedKey, expectedKey)) {
       throw new UnauthorizedException({
         error: ErrorCode.SIMULATION_UNAUTHORIZED,
         message:

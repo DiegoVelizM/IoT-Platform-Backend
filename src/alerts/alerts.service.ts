@@ -15,6 +15,7 @@ import { KafkaPublishResult } from '../kafka/interfaces/kafka-publish-result.int
 import { AnalyticsEventsService } from '../analytics/analytics-events.service';
 import { AnalyticsAlertContext } from '../analytics/interfaces/analytics-alert-context.interface';
 import { IncidentsEventsService } from '../incidents/incidents-events.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class AlertsService {
@@ -26,6 +27,7 @@ export class AlertsService {
     private readonly kafkaProducer: KafkaProducerService,
     private readonly analyticsEventsService: AnalyticsEventsService,
     private readonly incidentsEventsService: IncidentsEventsService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async create(
@@ -39,15 +41,15 @@ export class AlertsService {
       const publishResult = await this.kafkaProducer.emit(
         KAFKA_TOPICS.ALERT_GENERATED,
         {
-        eventId: randomUUID(),
-        eventType: EventType.ALERT_GENERATED,
-        occurredAt: new Date(),
-        source: 'iot-platform',
-        sensorId: savedAlert.sensorId,
-        alertType: savedAlert.type,
-        severity: savedAlert.severity,
-        message: savedAlert.message,
-      },
+          eventId: randomUUID(),
+          eventType: EventType.ALERT_GENERATED,
+          occurredAt: new Date(),
+          source: 'iot-platform',
+          sensorId: savedAlert.sensorId,
+          alertType: savedAlert.type,
+          severity: savedAlert.severity,
+          message: savedAlert.message,
+        },
       );
 
       this.logger.log(
@@ -59,6 +61,52 @@ export class AlertsService {
       }
 
       this.incidentsEventsService.publishAlert(savedAlert, analyticsContext);
+
+      // --- NOTIFICACIONES (integrado con Grupo 6) ---
+      if (
+        savedAlert.severity === 'warning' ||
+        savedAlert.severity === 'critical'
+      ) {
+        try {
+          const recipientInfo = {
+            email: 'destinatario@ejemplo.com',
+            // telefono: '+56912345678',
+          };
+
+          // CAMBIO: Usamos notación de corchetes para assetId
+          const assetId = savedAlert['assetId'] as string | undefined;
+
+          await this.notificationsService.sendNotification(
+            {
+              sensorId: savedAlert.sensorId,
+              assetId: assetId, // ahora es undefined si no existe, pero es válido
+              type: savedAlert.type,
+              severity: savedAlert.severity,
+              message: savedAlert.message,
+              subject: `Alerta ${savedAlert.severity.toUpperCase()} - ${savedAlert.sensorId}`,
+              body: {
+                email: `<p><strong>Alerta:</strong> ${savedAlert.message}</p>
+                        <p><strong>Sensor:</strong> ${savedAlert.sensorId}</p>
+                        <p><strong>Severidad:</strong> ${savedAlert.severity}</p>
+                        <p><strong>Tipo:</strong> ${savedAlert.type || 'N/A'}</p>`,
+                sms: `ALERTA ${savedAlert.severity.toUpperCase()} - ${savedAlert.sensorId}: ${savedAlert.message}`,
+              },
+            },
+            recipientInfo,
+          );
+
+          this.logger.log(
+            `Notification sent for alert ${savedAlert._id} (${savedAlert.severity})`,
+          );
+        } catch (notifError) {
+          // CAMBIO: Manejo seguro del error
+          const error = notifError instanceof Error ? notifError : new Error(String(notifError));
+          this.logger.error(
+            `Failed to send notification for alert ${savedAlert._id}: ${error.message}`,
+            error.stack,
+          );
+        }
+      }
 
       return this.appendWarnings(savedAlert.toObject(), [publishResult]);
     } catch (error) {

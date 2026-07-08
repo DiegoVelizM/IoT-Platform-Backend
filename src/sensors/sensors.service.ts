@@ -108,184 +108,224 @@ export class SensorsService {
   }
 
   private async checkBatteryAlert(data: CreateSensorReadingDto) {
-    if (
-      data.batteryLevel === undefined ||
-      data.batteryLevel >= SENSOR_THRESHOLDS.BATTERY.LOW
-    ) {
+    if (data.batteryLevel === undefined) {
       return;
     }
 
-    await this.alertsService.create(
-      {
-      sensorId: data.sensorId,
-      type: 'low_battery',
-      severity:
-        data.batteryLevel < SENSOR_THRESHOLDS.BATTERY.CRITICAL
-          ? 'critical'
-          : 'warning',
-      message: `Battery level is low: ${data.batteryLevel}%`,
-      resolved: false,
-    },
-      this.buildAnalyticsContext(data, 'low_battery'),
-    );
+    if (data.batteryLevel < SENSOR_THRESHOLDS.BATTERY.LOW) {
+      await this.alertsService.create(
+        {
+          sensorId: data.sensorId,
+          type: 'low_battery',
+          severity:
+            data.batteryLevel < SENSOR_THRESHOLDS.BATTERY.CRITICAL
+              ? 'critical'
+              : 'warning',
+          message: `Battery level is low: ${data.batteryLevel}%`,
+          resolved: false,
+        },
+        this.buildAnalyticsContext(data, 'low_battery'),
+      );
+      return;
+    }
+
+    await this.alertsService.resolveOpenAlert(data.sensorId, 'low_battery');
   }
 
   private async checkSensorOfflineAlert(
     data: CreateSensorReadingDto,
     kafkaResults: KafkaPublishResult[],
   ) {
-    if (data.connectionStatus !== 'offline') {
+    if (data.connectionStatus === 'offline') {
+      await this.alertsService.create(
+        {
+          sensorId: data.sensorId,
+          type: 'sensor_offline',
+          severity: 'critical',
+          message: 'Sensor is offline',
+          resolved: false,
+        },
+        this.buildAnalyticsContext(data, 'sensor_offline'),
+      );
+
+      const publishResult = await this.kafkaProducer.emit(
+        KAFKA_TOPICS.SENSOR_OFFLINE,
+        {
+          eventId: randomUUID(),
+          eventType: EventType.SENSOR_OFFLINE,
+          occurredAt: new Date(),
+          source: 'iot-platform',
+          sensorId: data.sensorId,
+          assetId: data.assetId,
+          sensorType: data.sensorType,
+          connectionStatus: data.connectionStatus,
+        },
+      );
+
+      kafkaResults.push(publishResult);
       return;
     }
 
-    await this.alertsService.create(
-      {
-      sensorId: data.sensorId,
-      type: 'sensor_offline',
-      severity: 'critical',
-      message: 'Sensor is offline',
-      resolved: false,
-    },
-      this.buildAnalyticsContext(data, 'sensor_offline'),
-    );
-
-    const publishResult = await this.kafkaProducer.emit(
-      KAFKA_TOPICS.SENSOR_OFFLINE,
-      {
-      eventId: randomUUID(),
-      eventType: EventType.SENSOR_OFFLINE,
-      occurredAt: new Date(),
-      source: 'iot-platform',
-      sensorId: data.sensorId,
-      assetId: data.assetId,
-      sensorType: data.sensorType,
-      connectionStatus: data.connectionStatus,
-    },
-    );
-
-    kafkaResults.push(publishResult);
+    if (data.connectionStatus === 'connected') {
+      await this.alertsService.resolveOpenAlert(data.sensorId, 'sensor_offline');
+    }
   }
 
   private async checkColdChainTemperatureAlert(data: CreateSensorReadingDto) {
-    if (
-      data.temperature === undefined ||
-      (data.temperature >= SENSOR_THRESHOLDS.COLD_CHAIN_TEMPERATURE.MIN &&
-        data.temperature <= SENSOR_THRESHOLDS.COLD_CHAIN_TEMPERATURE.MAX)
-    ) {
+    if (data.temperature === undefined) {
       return;
     }
 
-    await this.alertsService.create(
-      {
-      sensorId: data.sensorId,
-      type: 'temperature_out_of_range',
-      severity: 'warning',
-      message: `Temperature out of range: ${data.temperature}°C`,
-      resolved: false,
-    },
-      this.buildAnalyticsContext(data, 'temperature_out_of_range'),
+    if (
+      data.temperature < SENSOR_THRESHOLDS.COLD_CHAIN_TEMPERATURE.MIN ||
+      data.temperature > SENSOR_THRESHOLDS.COLD_CHAIN_TEMPERATURE.MAX
+    ) {
+      await this.alertsService.create(
+        {
+          sensorId: data.sensorId,
+          type: 'temperature_out_of_range',
+          severity: 'warning',
+          message: `Temperature out of range: ${data.temperature}°C`,
+          resolved: false,
+        },
+        this.buildAnalyticsContext(data, 'temperature_out_of_range'),
+      );
+      return;
+    }
+
+    await this.alertsService.resolveOpenAlert(
+      data.sensorId,
+      'temperature_out_of_range',
     );
   }
 
   private async checkGlucoseAlert(data: CreateSensorReadingDto) {
-    if (
-      data.glucoseLevel === undefined ||
-      (data.glucoseLevel >= SENSOR_THRESHOLDS.GLUCOSE.LOW &&
-        data.glucoseLevel <= SENSOR_THRESHOLDS.GLUCOSE.HIGH)
-    ) {
+    if (data.glucoseLevel === undefined) {
       return;
     }
 
-    await this.alertsService.create(
-      {
-      sensorId: data.sensorId,
-      type: 'glucose_out_of_range',
-      severity:
-        data.glucoseLevel < SENSOR_THRESHOLDS.GLUCOSE.CRITICAL_LOW ||
-        data.glucoseLevel > SENSOR_THRESHOLDS.GLUCOSE.CRITICAL_HIGH
-          ? 'critical'
-          : 'warning',
-      message: `Glucose level out of range: ${data.glucoseLevel}`,
-      resolved: false,
-    },
-      this.buildAnalyticsContext(data, 'glucose_out_of_range'),
+    if (
+      data.glucoseLevel < SENSOR_THRESHOLDS.GLUCOSE.LOW ||
+      data.glucoseLevel > SENSOR_THRESHOLDS.GLUCOSE.HIGH
+    ) {
+      await this.alertsService.create(
+        {
+          sensorId: data.sensorId,
+          type: 'glucose_out_of_range',
+          severity:
+            data.glucoseLevel < SENSOR_THRESHOLDS.GLUCOSE.CRITICAL_LOW ||
+            data.glucoseLevel > SENSOR_THRESHOLDS.GLUCOSE.CRITICAL_HIGH
+              ? 'critical'
+              : 'warning',
+          message: `Glucose level out of range: ${data.glucoseLevel}`,
+          resolved: false,
+        },
+        this.buildAnalyticsContext(data, 'glucose_out_of_range'),
+      );
+      return;
+    }
+
+    await this.alertsService.resolveOpenAlert(
+      data.sensorId,
+      'glucose_out_of_range',
     );
   }
 
   private async checkOxygenSaturationAlert(data: CreateSensorReadingDto) {
-    if (
-      data.oxygenSaturation === undefined ||
-      data.oxygenSaturation >= SENSOR_THRESHOLDS.OXYGEN_SATURATION.LOW
-    ) {
+    if (data.oxygenSaturation === undefined) {
       return;
     }
 
-    await this.alertsService.create(
-      {
-      sensorId: data.sensorId,
-      type: 'oxygen_saturation_low',
-      severity:
-        data.oxygenSaturation < SENSOR_THRESHOLDS.OXYGEN_SATURATION.CRITICAL
-          ? 'critical'
-          : 'warning',
-      message: `Low oxygen saturation: ${data.oxygenSaturation}%`,
-      resolved: false,
-    },
-      this.buildAnalyticsContext(data, 'oxygen_saturation_low'),
+    if (data.oxygenSaturation < SENSOR_THRESHOLDS.OXYGEN_SATURATION.LOW) {
+      await this.alertsService.create(
+        {
+          sensorId: data.sensorId,
+          type: 'oxygen_saturation_low',
+          severity:
+            data.oxygenSaturation <
+            SENSOR_THRESHOLDS.OXYGEN_SATURATION.CRITICAL
+              ? 'critical'
+              : 'warning',
+          message: `Low oxygen saturation: ${data.oxygenSaturation}%`,
+          resolved: false,
+        },
+        this.buildAnalyticsContext(data, 'oxygen_saturation_low'),
+      );
+      return;
+    }
+
+    await this.alertsService.resolveOpenAlert(
+      data.sensorId,
+      'oxygen_saturation_low',
     );
   }
 
   private async checkHeartRateAlert(data: CreateSensorReadingDto) {
-    if (
-      data.heartRate === undefined ||
-      (data.heartRate >= SENSOR_THRESHOLDS.HEART_RATE.LOW &&
-        data.heartRate <= SENSOR_THRESHOLDS.HEART_RATE.HIGH)
-    ) {
+    if (data.heartRate === undefined) {
       return;
     }
 
-    await this.alertsService.create(
-      {
-      sensorId: data.sensorId,
-      type: 'heart_rate_out_of_range',
-      severity:
-        data.heartRate < SENSOR_THRESHOLDS.HEART_RATE.CRITICAL_LOW ||
-        data.heartRate > SENSOR_THRESHOLDS.HEART_RATE.CRITICAL_HIGH
-          ? 'critical'
-          : 'warning',
-      message: `Heart rate out of range: ${data.heartRate} bpm`,
-      resolved: false,
-    },
-      this.buildAnalyticsContext(data, 'heart_rate_out_of_range'),
+    if (
+      data.heartRate < SENSOR_THRESHOLDS.HEART_RATE.LOW ||
+      data.heartRate > SENSOR_THRESHOLDS.HEART_RATE.HIGH
+    ) {
+      await this.alertsService.create(
+        {
+          sensorId: data.sensorId,
+          type: 'heart_rate_out_of_range',
+          severity:
+            data.heartRate < SENSOR_THRESHOLDS.HEART_RATE.CRITICAL_LOW ||
+            data.heartRate > SENSOR_THRESHOLDS.HEART_RATE.CRITICAL_HIGH
+              ? 'critical'
+              : 'warning',
+          message: `Heart rate out of range: ${data.heartRate} bpm`,
+          resolved: false,
+        },
+        this.buildAnalyticsContext(data, 'heart_rate_out_of_range'),
+      );
+      return;
+    }
+
+    await this.alertsService.resolveOpenAlert(
+      data.sensorId,
+      'heart_rate_out_of_range',
     );
   }
 
   private async checkBloodPressureAlert(data: CreateSensorReadingDto) {
     if (
       data.systolicPressure === undefined ||
-      data.diastolicPressure === undefined ||
-      (data.systolicPressure < SENSOR_THRESHOLDS.BLOOD_PRESSURE.SYSTOLIC_HIGH &&
-        data.diastolicPressure <
-          SENSOR_THRESHOLDS.BLOOD_PRESSURE.DIASTOLIC_HIGH)
+      data.diastolicPressure === undefined
     ) {
       return;
     }
 
-    await this.alertsService.create(
-      {
-      sensorId: data.sensorId,
-      type: 'blood_pressure_high',
-      severity:
-        data.systolicPressure >=
-          SENSOR_THRESHOLDS.BLOOD_PRESSURE.SYSTOLIC_CRITICAL ||
-        data.diastolicPressure >=
-          SENSOR_THRESHOLDS.BLOOD_PRESSURE.DIASTOLIC_CRITICAL
-          ? 'critical'
-          : 'warning',
-      message: `Blood pressure elevated: ${data.systolicPressure}/${data.diastolicPressure}`,
-      resolved: false,
-    },
-      this.buildAnalyticsContext(data, 'blood_pressure_high'),
+    if (
+      data.systolicPressure >= SENSOR_THRESHOLDS.BLOOD_PRESSURE.SYSTOLIC_HIGH ||
+      data.diastolicPressure >= SENSOR_THRESHOLDS.BLOOD_PRESSURE.DIASTOLIC_HIGH
+    ) {
+      await this.alertsService.create(
+        {
+          sensorId: data.sensorId,
+          type: 'blood_pressure_high',
+          severity:
+            data.systolicPressure >=
+              SENSOR_THRESHOLDS.BLOOD_PRESSURE.SYSTOLIC_CRITICAL ||
+            data.diastolicPressure >=
+              SENSOR_THRESHOLDS.BLOOD_PRESSURE.DIASTOLIC_CRITICAL
+              ? 'critical'
+              : 'warning',
+          message: `Blood pressure elevated: ${data.systolicPressure}/${data.diastolicPressure}`,
+          resolved: false,
+        },
+        this.buildAnalyticsContext(data, 'blood_pressure_high'),
+      );
+      return;
+    }
+
+    await this.alertsService.resolveOpenAlert(
+      data.sensorId,
+      'blood_pressure_high',
     );
   }
 

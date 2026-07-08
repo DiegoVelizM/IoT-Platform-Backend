@@ -14,3 +14,11 @@ export interface KafkaHealthStatus {
   lastError?: string;
   lastErrorCode?: ErrorCode.KAFKA_CONNECTION_FAILED | ErrorCode.KAFKA_PUBLISH_FAILED;
 }
+
+export interface KafkaConsumerHealthStatus {
+  connected: boolean;
+  groupId: string;
+  messagesConsumed: number;
+  lastError?: string;
+  lastErrorCode?: ErrorCode.KAFKA_CONNECTION_FAILED;
+}

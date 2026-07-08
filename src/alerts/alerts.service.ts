@@ -35,6 +35,21 @@ export class AlertsService {
     analyticsContext?: AnalyticsAlertContext,
   ) {
     try {
+      const existingOpen = await this.alertModel
+        .findOne({
+          sensorId: createAlertDto.sensorId,
+          type: createAlertDto.type,
+          resolved: false,
+        })
+        .exec();
+
+      if (existingOpen) {
+        this.logger.debug(
+          `Open alert already exists for ${createAlertDto.sensorId}/${createAlertDto.type}, skipping duplicate`,
+        );
+        return existingOpen.toObject();
+      }
+
       const alert = new this.alertModel(createAlertDto);
       const savedAlert = await alert.save();
 
@@ -116,6 +131,32 @@ export class AlertsService {
       );
       throw error;
     }
+  }
+
+  async resolveOpenAlert(sensorId: string, alertType: string): Promise<void> {
+    const alert = await this.alertModel
+      .findOne({ sensorId, type: alertType, resolved: false })
+      .exec();
+
+    if (!alert) {
+      this.logger.debug(
+        `No open alert to resolve for sensor=${sensorId} alertType=${alertType}`,
+      );
+      return;
+    }
+
+    alert.resolved = true;
+    await alert.save();
+
+    this.incidentsEventsService.publishResolved(
+      alert.sensorId,
+      alert.type,
+      alert.severity,
+    );
+
+    this.logger.log(
+      `Alert resolved in MongoDB: sensor=${sensorId} alertType=${alertType} severity=${alert.severity}`,
+    );
   }
 
   async createMany(alerts: CreateAlertDto[]) {

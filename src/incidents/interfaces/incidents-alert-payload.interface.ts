@@ -5,8 +5,8 @@ export interface IncidentsAlertPayload {
   source: string;
   sensorId: string;
   alertType: string;
-  severity: string;
-  message: string;
+  severity?: string;
+  message?: string;
   assetId?: string;
 }
 

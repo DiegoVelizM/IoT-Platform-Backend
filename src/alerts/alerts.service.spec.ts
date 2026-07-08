@@ -5,6 +5,7 @@ import { Alert } from './schemas/alert.schema';
 import { KafkaProducerService } from '../kafka/kafka-producer.service';
 import { AnalyticsEventsService } from '../analytics/analytics-events.service';
 import { IncidentsEventsService } from '../incidents/incidents-events.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { ResourceNotFoundException } from '../common/exceptions/resource-not-found.exception';
 
 describe('AlertsService', () => {
@@ -57,6 +58,10 @@ describe('AlertsService', () => {
         {
           provide: IncidentsEventsService,
           useValue: incidentsEventsService,
+        },
+        {
+          provide: NotificationsService,
+          useValue: { sendNotification: jest.fn().mockResolvedValue({ success: true }) },
         },
       ],
     }).compile();

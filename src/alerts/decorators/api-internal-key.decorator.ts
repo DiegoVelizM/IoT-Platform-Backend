@@ -7,7 +7,7 @@ export function ApiInternalKeyRequired() {
     ApiHeader({
       name: 'X-Internal-Api-Key',
       description:
-        'Clave interna del equipo P08 para crear alertas manualmente vía POST /alerts',
+        'Clave interna del equipo P08 para invocar endpoints internos (ej.: POST /alerts, /notifications/*)',
       required: true,
     }),
     ApiUnauthorizedResponse({

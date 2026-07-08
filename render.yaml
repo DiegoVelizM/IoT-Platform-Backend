@@ -24,6 +24,16 @@ services:
         value: https://analisis-proyecto-ti.onrender.com/v1/events
       - key: ANALYTICS_EVENTS_ENABLED
         value: "true"
+      - key: NOTIFICATIONS_API_URL
+        value: https://ucn-agil-notificaciones.up.railway.app
+      - key: NOTIFICATIONS_ENABLED
+        value: "true"
+      - key: NOTIFICATIONS_API_KEY
+        sync: false
+      - key: NOTIFICATIONS_DEFAULT_EMAIL
+        sync: false
+      - key: NOTIFICATIONS_DEFAULT_PHONE
+        sync: false
       - key: SIMULATION_API_KEY
         generateValue: true
       - key: INTERNAL_API_KEY

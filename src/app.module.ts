@@ -12,6 +12,7 @@ import { SimulationModule } from './simulation/simulation.module';
 import { KafkaModule } from './kafka/kafka.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { IncidentsModule } from './incidents/incidents.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { IncidentsModule } from './incidents/incidents.module';
     KafkaModule,
     AnalyticsModule,
     IncidentsModule,
+    NotificationsModule,
     SimulationModule,
   ],
   controllers: [AppController],

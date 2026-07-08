@@ -135,6 +135,24 @@ ANALYTICS_EVENTS_SOURCE=iot_devices
 | `ANALYTICS_EVENTS_ENABLED` | `false` desactiva el envío aunque haya URL |
 | `ANALYTICS_EVENTS_SOURCE` | Campo `source` del envelope (default `iot_devices`) |
 
+**Integración con notificaciones (Proyecto 06):** el backend puede enviar notificaciones cuando se generan alertas `warning`/`critical`:
+
+```env
+NOTIFICATIONS_API_URL=https://ucn-agil-notificaciones.up.railway.app
+NOTIFICATIONS_API_KEY=<api key entregada por P06>
+NOTIFICATIONS_DEFAULT_EMAIL=<correo por defecto para alertas>
+NOTIFICATIONS_DEFAULT_PHONE=<telefono por defecto opcional>
+NOTIFICATIONS_ENABLED=true
+```
+
+| Variable | Efecto |
+|----------|--------|
+| `NOTIFICATIONS_API_URL` | Endpoint base de P06. Si no está definida, la integración queda deshabilitada |
+| `NOTIFICATIONS_API_KEY` | API key enviada en header `x-api-key` |
+| `NOTIFICATIONS_DEFAULT_EMAIL` | Destinatario por defecto cuando la alerta no trae `recipient.email` |
+| `NOTIFICATIONS_DEFAULT_PHONE` | Destinatario telefónico por defecto para SMS (opcional) |
+| `NOTIFICATIONS_ENABLED` | `false` desactiva la integración aunque exista URL/API key |
+
 > **Rate limit de P09:** su API rechaza exceso de tráfico con HTTP 429 (`máximo 100 requests por 60s`). Cada lectura y cada alerta generan un `POST` a P09. Para demo integrada con su dashboard en pantalla, usar **≤20–30 sensores** e intervalo **≥15 s**. Para pruebas de escala con 1.000 sensores, desactivar analytics: `ANALYTICS_EVENTS_ENABLED=false`.
 
 #### Hallazgos de integración P09 (pruebas 03–04/07)
@@ -167,7 +185,7 @@ WARN P09 publish failed (telemetry_received) [TIMEOUT]: UND_ERR_CONNECT_TIMEOUT:
 
 > Correr 1000 sensores con analytics activo **desde local** igual golpea P09 en prod (misma URL). Desactivar analytics en pruebas de escala.
 
-**P11 vs P09:** P11 recibe solo alertas `critical` (mucho menos volumen) y reintenta hasta 4 veces. P09 recibe **cada telemetría + cada alerta** sin reintentos, para no multiplicar carga ante `429`.
+**P11 vs P09:** P11 recibe alertas según `INCIDENTS_MIN_SEVERITY` (default actual `warning`) y reintenta hasta 4 veces. P09 recibe **cada telemetría + cada alerta** sin reintentos, para no multiplicar carga ante `429`.
 
 Los fallos hacia P09/P11 se loguean con categoría explícita (`RATE_LIMIT`, `SERVER_ERROR`, `CLIENT_ERROR`, `NETWORK_ERROR`, `TIMEOUT`), URL destino y detalle de red cuando aplica. Implementación: `src/common/utils/http-fetch-error.util.ts`.
 
@@ -178,7 +196,7 @@ INCIDENTS_ALERTS_URL=https://proyecto11-mochicode.onrender.com/api/v1/alertas
 INCIDENTS_API_KEY=<api key Zero Trust entregada por P11>
 INCIDENTS_JWT_TOKEN=<token JWT emitido por P12, cuando este disponible>
 INCIDENTS_SYSTEM_ID=P08
-INCIDENTS_MIN_SEVERITY=critical
+INCIDENTS_MIN_SEVERITY=warning
 INCIDENTS_ALERTS_ENABLED=true
 ```
 
@@ -188,10 +206,10 @@ INCIDENTS_ALERTS_ENABLED=true
 | `INCIDENTS_API_KEY` | API Key Zero Trust de P11. Se envía en el header `x-api-key` |
 | `INCIDENTS_JWT_TOKEN` | Bearer token para autenticación futura con P12, si P11 lo habilita |
 | `INCIDENTS_SYSTEM_ID` | Identificador del sistema emisor (default `P08`) |
-| `INCIDENTS_MIN_SEVERITY` | Severidad mínima que se envía a P11: `critical` (default) o `warning`. Con `critical`, las alertas `warning` no se envían a incidentes |
+| `INCIDENTS_MIN_SEVERITY` | Severidad mínima que se envía a P11: `warning` (default actual) o `critical`. Con `critical`, las alertas `warning` no se envían a incidentes |
 | `INCIDENTS_ALERTS_ENABLED` | `false` desactiva el envío aunque haya URL |
 
-> **Solo incidentes críticos:** por defecto P08 envía a P11 únicamente alertas `critical` (las que ameritan un ticket). Las `warning` se siguen guardando en MongoDB, publicando en Kafka y enviando a analítica (P09), pero no generan incidentes en P11.
+> **Umbral configurable en P11:** actualmente P08 envía a P11 alertas `warning` y `critical` (default `INCIDENTS_MIN_SEVERITY=warning`). Si necesitas reducir ruido, configura `INCIDENTS_MIN_SEVERITY=critical`.
 
 Payload enviado a P11 (formato camelCase plano dentro del envelope de P11):
 
@@ -493,6 +511,8 @@ Ejemplo de body:
 }
 ```
 
+`POST /alerts` requiere header `X-Internal-Api-Key` (valor `INTERNAL_API_KEY` en servidor).
+
 ---
 
 ### Eventos
@@ -502,6 +522,17 @@ POST /events/test
 ```
 
 Endpoint temporal para validar contratos de eventos. Actualmente registra el evento en consola; no publica a Kafka.
+
+### Notificaciones internas (P06)
+
+```http
+POST /notifications/send
+POST /notifications/test
+GET  /notifications/failed
+POST /notifications/retry-failed
+```
+
+Estos endpoints son de operación interna y requieren `X-Internal-Api-Key`. Se usan para pruebas controladas del flujo con P06 y para reintentar envíos fallidos persistidos en MongoDB.
 
 Ejemplo de body:
 
@@ -574,7 +605,7 @@ Sensores simulados / POST /telemetry
        ↓
   KafkaConsumerService (log / contador; no re-guarda en Mongo ni reenvía a P09)
   → AnalyticsEventsService → HTTP P09 (dashboards y tendencias)
-  → IncidentsEventsService → HTTP P11 (solo alertas critical)
+  → IncidentsEventsService → HTTP P11 (umbral configurable warning/critical)
 ```
 
 P08 expone datos vía API (`GET /sensors/*`) para **P01** y eventos HTTP para **P09** (visualización) y **P11** (incidentes críticos). No implementamos paneles propios.
@@ -829,7 +860,7 @@ Proyecto académico en desarrollo activo. Documentación detallada del equipo: [
 - Productor Kafka con publicación de eventos
 - Consumidor Kafka interno (`KafkaConsumerService`) con logs y contador
 - Integración HTTP con P09 (analítica / dashboards)
-- Integración HTTP con P11 (incidentes, solo alertas `critical`)
+- Integración HTTP con P11 (incidentes con umbral configurable `warning`/`critical`)
 - Estandarización de errores HTTP 400/404/500 con `HttpExceptionFilter`
 - Manejo estructurado de errores Kafka con `warnings` en respuestas y estado en `/health`
 - Documentación Swagger con respuestas de error por endpoint
@@ -842,9 +873,7 @@ Proyecto académico en desarrollo activo. Documentación detallada del equipo: [
 
 - Evidencia documentada de prueba 1.000 sensores (Mongo + consumer)
 - Retención y agregación de datos (requisito del enunciado) — **TTL lecturas 7 días** implementado; agregación mínima pendiente
-- Integración P06 notificaciones (otro compañero)
 - Confirmación de P01 sobre contrato de telemetría
-- Deduplicación y resolución de alertas activas
 - Integración del endpoint `/events/test` con Kafka
 
 **Fuera de alcance:**

@@ -1,37 +1,85 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { HttpService } from '@nestjs/axios'; // Asegúrate de tener la dependencia instalada
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { AxiosResponse, AxiosError } from 'axios'; // Para tipar la respuesta y el error
+import { AxiosResponse, AxiosError } from 'axios';
 import {
+  NotificationBody,
+  NotificationChannel,
   NotificationPayload,
   NotificationRecipient,
   NotificationResponse,
 } from './interfaces/notification.interface';
 import { FailedNotification } from './schemas/failed-notification.schema';
 
+interface NotificationAlertInput {
+  sensorId?: string;
+  severity?: string;
+  message?: string;
+  type?: string;
+  channel?: NotificationChannel;
+  subject?: string;
+  body?: NotificationBody;
+  recipient?: NotificationRecipient;
+  [key: string]: unknown;
+}
+
 @Injectable()
-export class NotificationsService {
+export class NotificationsService implements OnModuleInit {
   private readonly logger = new Logger(NotificationsService.name);
   private readonly maxRetries = 3;
   private readonly backoffDelaysMs = [1000, 2000, 4000];
-  private readonly failedInMemory: Array<Record<string, unknown>> = [];
+  private readonly explicitlyDisabled =
+    process.env.NOTIFICATIONS_ENABLED === 'false';
 
   constructor(
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
     @InjectModel(FailedNotification.name)
     private readonly failedNotificationModel: Model<FailedNotification>,
-  ) {
-    const apiKey = this.configService.get<string>('NOTIFICATIONS_API_KEY', 'NOT_CONFIGURED');
-    const apiUrl = this.configService.get<string>('NOTIFICATIONS_API_URL', 'NOT_CONFIGURED');
-    this.logger.log(`NotificationsService initialized with API_URL: ${apiUrl}`);
-    this.logger.log(`NotificationsService initialized with API_KEY: ${apiKey ? 'CONFIGURED' : 'NOT_CONFIGURED'}`);
+  ) {}
+
+  private get enabled(): boolean {
+    return !this.explicitlyDisabled && Boolean(this.getApiUrl() && this.getApiKey());
   }
 
-  async sendNotification(alert: any, recipientInfo?: any): Promise<NotificationResponse> {
+  onModuleInit(): void {
+    if (this.explicitlyDisabled) {
+      this.logger.log('Notifications integration disabled via NOTIFICATIONS_ENABLED=false');
+      return;
+    }
+
+    if (!this.getApiUrl()) {
+      this.logger.warn(
+        'Notifications integration disabled: NOTIFICATIONS_API_URL is not configured',
+      );
+      return;
+    }
+
+    if (!this.getApiKey()) {
+      this.logger.warn(
+        'Notifications integration disabled: NOTIFICATIONS_API_KEY is not configured',
+      );
+      return;
+    }
+
+    this.logger.log(`Notifications integration enabled -> ${this.getApiUrl()}`);
+  }
+
+  async sendNotification(
+    alert: NotificationAlertInput,
+    recipientInfo?: NotificationRecipient,
+  ): Promise<NotificationResponse> {
+    if (!this.enabled) {
+      return {
+        success: false,
+        message: 'Notifications integration is disabled',
+        attempts: 0,
+      };
+    }
+
     const payload = this.buildPayload(alert, recipientInfo);
 
     this.logger.log(
@@ -105,13 +153,14 @@ export class NotificationsService {
 
       try {
         const apiKey = this.getApiKey();
-        this.logger.debug(`Sending request with API_KEY: ${apiKey ? 'SET' : 'EMPTY'}`);
-        
-        // Tipamos la respuesta correctamente
+        this.logger.debug(
+          `Sending notification with API key configured=${Boolean(apiKey)}`,
+        );
+
         const response: AxiosResponse = await firstValueFrom(
           this.httpService.post(endpointUrl, payload, {
             headers: {
-              'x-api-key': apiKey, // ✅ Header corregido
+              'x-api-key': apiKey,
             },
           }),
         );
@@ -129,7 +178,6 @@ export class NotificationsService {
           payload,
         };
       } catch (error) {
-        // Tipamos el error como AxiosError para acceder a la respuesta
         const parsedError = this.parseHttpError(error as AxiosError);
 
         this.logger.error(
@@ -177,7 +225,10 @@ export class NotificationsService {
     };
   }
 
-  private buildPayload(alert: any, recipientInfo?: any): NotificationPayload {
+  private buildPayload(
+    alert: NotificationAlertInput,
+    recipientInfo?: NotificationRecipient,
+  ): NotificationPayload {
     const recipient = this.resolveRecipient(alert, recipientInfo);
     const channel = this.resolveChannel(alert, recipient);
 
@@ -213,18 +264,21 @@ export class NotificationsService {
     return payload;
   }
 
-  private resolveRecipient(alert: any, recipientInfo?: any): NotificationRecipient {
+  private resolveRecipient(
+    alert: NotificationAlertInput,
+    recipientInfo?: NotificationRecipient,
+  ): NotificationRecipient {
     const email =
       recipientInfo?.email ??
-      alert?.recipient?.email ??
+      (alert.recipient?.email ??
       this.configService.get<string>('NOTIFICATIONS_DEFAULT_EMAIL') ??
-      undefined;
+      undefined);
 
     const telefono =
       recipientInfo?.telefono ??
-      alert?.recipient?.telefono ??
+      (alert.recipient?.telefono ??
       this.configService.get<string>('NOTIFICATIONS_DEFAULT_PHONE') ??
-      undefined;
+      undefined);
 
     if (!email && !telefono) {
       throw new Error(
@@ -239,10 +293,10 @@ export class NotificationsService {
   }
 
   private resolveChannel(
-    alert: any,
+    alert: NotificationAlertInput,
     recipient: NotificationRecipient,
   ): 'email' | 'sms' {
-    if (alert?.channel === 'email' || alert?.channel === 'sms') {
+    if (alert.channel === 'email' || alert.channel === 'sms') {
       return alert.channel;
     }
 
@@ -289,32 +343,21 @@ export class NotificationsService {
       retryCount: 0,
     });
 
-    this.failedInMemory.push({
-      id: String(failed._id),
-      payload,
-      errorMessage: parsedError.message,
-      attempts,
-      savedAt: new Date().toISOString(),
-    });
-
     this.logger.error(
       `Notification persisted as failed record ${String(failed._id)} after ${attempts} attempts`,
     );
   }
 
-  private getApiUrl(): string {
+  private getApiUrl(): string | undefined {
     return this.configService.get<string>(
       'NOTIFICATIONS_API_URL',
-      'https://ucn-agil-notificaciones.up.railway.app',
-    );
+    )?.trim();
   }
 
-  private getApiKey(): string {
-    // ✅ API Key actualizada (Proyecto 8)
+  private getApiKey(): string | undefined {
     return this.configService.get<string>(
       'NOTIFICATIONS_API_KEY',
-      '5MwKpRnXvB9qYtZ2eHsJdF7gCuA4LiN1', // Nueva clave
-    );
+    )?.trim();
   }
 
   private async sleep(ms: number): Promise<void> {

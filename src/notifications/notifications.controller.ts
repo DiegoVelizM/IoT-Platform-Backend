@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import {
   ApiBody,
   ApiCreatedResponse,
@@ -7,6 +7,8 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { ApiReadErrors, ApiWriteErrors } from '../common/decorators/api-standard-errors.decorator';
+import { InternalApiKeyGuard } from '../common/guards/internal-api-key.guard';
+import { ApiInternalKeyRequired } from '../alerts/decorators/api-internal-key.decorator';
 import {
   FailedNotificationDto,
   CreateNotificationDto,
@@ -17,6 +19,8 @@ import { NotificationsService } from './notifications.service';
 
 @ApiTags('Notifications')
 @Controller('notifications')
+@UseGuards(InternalApiKeyGuard)
+@ApiInternalKeyRequired()
 export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
 
@@ -47,10 +51,6 @@ export class NotificationsController {
           email: '<p>Prueba de integracion de notificaciones</p>',
           sms: 'Prueba de integracion de notificaciones',
         },
-      },
-      {
-        email: 'destinatario@ejemplo.com',
-        telefono: '+56912345678',
       },
     );
   }

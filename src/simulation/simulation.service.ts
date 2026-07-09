@@ -11,6 +11,10 @@ import {
   StartSimulationDto,
 } from './dto/start-simulation.dto';
 import { SENSOR_THRESHOLDS } from '../sensors/constants/sensor-thresholds.constants';
+import {
+  buildAnomalyProfile,
+  resolveAnomalyProbability,
+} from './simulation-anomaly';
 
 interface SensorSchedule {
   sensorId: string;
@@ -32,6 +36,9 @@ export class SimulationService implements OnModuleInit {
   private readonly DEFAULT_OFFLINE_PROBABILITY = 0.02;
   private readonly MAX_OFFLINE_PROBABILITY = 0.25;
   private readonly offlineProbability = this.resolveOfflineProbability();
+  private readonly anomalyProbability = resolveAnomalyProbability(
+    process.env.SIMULATION_ANOMALY_PROBABILITY,
+  );
 
   constructor(private readonly sensorsService: SensorsService) {}
 
@@ -46,6 +53,12 @@ export class SimulationService implements OnModuleInit {
     this.logger.log(
       `Auto-start habilitado: ${quantity} sensores cada ${frequencyMs} ms (con arranque escalonado)`,
     );
+
+    if (this.anomalyProbability > 0) {
+      this.logger.log(
+        `Probabilidad de lecturas anómalas: ${(this.anomalyProbability * 100).toFixed(0)}% (SIMULATION_ANOMALY_PROBABILITY)`,
+      );
+    }
 
     this.startSimulation({ quantity, frequencyMs });
   }
@@ -179,19 +192,7 @@ export class SimulationService implements OnModuleInit {
 
   private async generateAndSendReading(sensorId: string): Promise<void> {
     const sensorType = this.getMedicalSensorTypeFromId(sensorId);
-    const batteryLevel = this.getRandomBatteryLevel();
-    const isOffline = this.shouldSimulateOffline(batteryLevel);
-
-    const reading: CreateSensorReadingDto = {
-      sensorId,
-      assetId: this.getAssetIdFromSensor(sensorId),
-      sensorType,
-      batteryLevel,
-      connectionStatus: isOffline
-        ? ConnectionStatus.OFFLINE
-        : ConnectionStatus.CONNECTED,
-      ...(isOffline ? {} : this.generateMedicalValues(sensorType)),
-    };
+    const reading = this.buildSimulatedReading(sensorId, sensorType);
 
     try {
       await this.sensorsService.create(reading);
@@ -202,6 +203,69 @@ export class SimulationService implements OnModuleInit {
         error instanceof Error ? error.stack : String(error),
       );
     }
+  }
+
+  private buildSimulatedReading(
+    sensorId: string,
+    sensorType: MedicalSensorType,
+  ): CreateSensorReadingDto {
+    if (
+      this.anomalyProbability > 0 &&
+      Math.random() < this.anomalyProbability
+    ) {
+      return this.buildAnomalousReading(sensorId, sensorType);
+    }
+
+    const batteryLevel = this.getRandomBatteryLevel();
+    const isOffline = this.shouldSimulateOffline(batteryLevel);
+
+    return {
+      sensorId,
+      assetId: this.getAssetIdFromSensor(sensorId),
+      sensorType,
+      batteryLevel,
+      connectionStatus: isOffline
+        ? ConnectionStatus.OFFLINE
+        : ConnectionStatus.CONNECTED,
+      ...(isOffline ? {} : this.generateMedicalValues(sensorType)),
+    };
+  }
+
+  private buildAnomalousReading(
+    sensorId: string,
+    sensorType: MedicalSensorType,
+  ): CreateSensorReadingDto {
+    const profile = buildAnomalyProfile(sensorType);
+
+    if (profile.kind === 'sensor_offline') {
+      return {
+        sensorId,
+        assetId: this.getAssetIdFromSensor(sensorId),
+        sensorType,
+        batteryLevel: this.getRandomBatteryLevel(),
+        connectionStatus: ConnectionStatus.OFFLINE,
+      };
+    }
+
+    if (profile.kind === 'low_battery') {
+      return {
+        sensorId,
+        assetId: this.getAssetIdFromSensor(sensorId),
+        sensorType,
+        batteryLevel: profile.batteryLevel,
+        connectionStatus: ConnectionStatus.CONNECTED,
+        ...this.generateMedicalValues(sensorType),
+      };
+    }
+
+    return {
+      sensorId,
+      assetId: this.getAssetIdFromSensor(sensorId),
+      sensorType,
+      batteryLevel: profile.batteryLevel,
+      connectionStatus: ConnectionStatus.CONNECTED,
+      ...profile.values,
+    };
   }
 
   private getMedicalSensorTypeFromId(sensorId: string): MedicalSensorType {

@@ -46,6 +46,8 @@ services:
         value: "4"
       - key: SIMULATION_AUTO_FREQUENCY_MS
         value: "10000"
+      - key: SIMULATION_ANOMALY_PROBABILITY
+        value: "0"
       - key: INCIDENTS_ALERTS_URL
         value: https://proyecto11-mochicode.onrender.com/api/v1/alertas
       - key: INCIDENTS_API_KEY

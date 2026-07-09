@@ -1,4 +1,5 @@
 import { KafkaConfig, SASLOptions } from 'kafkajs';
+import { createKafkaJsLogCreator } from './kafka-logging';
 
 const DEFAULT_BROKER = 'kafka:9092';
 const DEFAULT_CLIENT_ID = 'iot-platform-backend';
@@ -42,6 +43,7 @@ export function resolveKafkaConfig(): ResolvedKafkaConfig {
     retry: { retries: 5 },
     connectionTimeout: isCloud ? 10_000 : 5_000,
     requestTimeout: isCloud ? 30_000 : 5_000,
+    logCreator: createKafkaJsLogCreator(),
   };
 
   if (!isCloud) {

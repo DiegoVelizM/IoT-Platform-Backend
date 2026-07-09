@@ -5,12 +5,14 @@ import { KAFKA_TOPICS } from './kafka-topics.constants';
 const mockRun = jest.fn().mockResolvedValue(undefined);
 const mockSubscribe = jest.fn().mockResolvedValue(undefined);
 const mockConnect = jest.fn().mockResolvedValue(undefined);
+const mockStop = jest.fn().mockResolvedValue(undefined);
 const mockDisconnect = jest.fn().mockResolvedValue(undefined);
 
 const mockConsumer = {
   connect: mockConnect,
   subscribe: mockSubscribe,
   run: mockRun,
+  stop: mockStop,
   disconnect: mockDisconnect,
 };
 
@@ -36,6 +38,7 @@ describe('KafkaConsumerService', () => {
     mockConnect.mockResolvedValue(undefined);
     mockSubscribe.mockResolvedValue(undefined);
     mockRun.mockResolvedValue(undefined);
+    mockStop.mockResolvedValue(undefined);
     mockDisconnect.mockResolvedValue(undefined);
     delete process.env.KAFKA_CONSUMER_GROUP_ID;
 
@@ -90,10 +93,11 @@ describe('KafkaConsumerService', () => {
     });
   });
 
-  it('disconnects on module destroy', async () => {
+  it('stops and disconnects on module destroy', async () => {
     await service.onModuleInit();
     await service.onModuleDestroy();
 
+    expect(mockStop).toHaveBeenCalledTimes(1);
     expect(mockDisconnect).toHaveBeenCalledTimes(1);
     expect(service.getHealthStatus().connected).toBe(false);
   });

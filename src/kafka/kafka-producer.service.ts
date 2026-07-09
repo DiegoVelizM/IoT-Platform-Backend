@@ -11,6 +11,7 @@ import {
   KafkaPublishResult,
 } from './interfaces/kafka-publish-result.interface';
 import { resolveKafkaConfig } from './kafka.config';
+import { findMissingKafkaTopics } from './kafka-topic-setup';
 import { KAFKA_TOPICS } from './kafka-topics.constants';
 
 @Injectable()
@@ -175,14 +176,25 @@ export class KafkaProducerService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async ensureTopics(): Promise<void> {
-    const topics = Object.values(KAFKA_TOPICS);
+    const requiredTopics = Object.values(KAFKA_TOPICS);
     const admin = this.kafka.admin();
 
     try {
       await admin.connect();
 
+      const existingTopics = await admin.listTopics();
+      const missingTopics = findMissingKafkaTopics(
+        requiredTopics,
+        existingTopics,
+      );
+
+      if (missingTopics.length === 0) {
+        this.logger.log(`Kafka topics ready: ${requiredTopics.join(', ')}`);
+        return;
+      }
+
       await admin.createTopics({
-        topics: topics.map((topic) => ({
+        topics: missingTopics.map((topic) => ({
           topic,
           numPartitions: 1,
           replicationFactor: 1,
@@ -190,7 +202,8 @@ export class KafkaProducerService implements OnModuleInit, OnModuleDestroy {
         waitForLeaders: true,
       });
 
-      this.logger.log(`Kafka topics ensured: ${topics.join(', ')}`);
+      this.logger.log(`Created Kafka topics: ${missingTopics.join(', ')}`);
+      this.logger.log(`Kafka topics ensured: ${requiredTopics.join(', ')}`);
     } catch (err) {
       this.logger.warn(
         'Could not ensure Kafka topics',

@@ -139,9 +139,6 @@ export class AlertsService {
       .exec();
 
     if (!alert) {
-      this.logger.debug(
-        `No open alert to resolve for sensor=${sensorId} alertType=${alertType}`,
-      );
       return;
     }
 

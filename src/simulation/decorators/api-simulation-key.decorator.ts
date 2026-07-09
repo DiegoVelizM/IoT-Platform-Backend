@@ -7,7 +7,7 @@ export function ApiSimulationKeyRequired() {
     ApiHeader({
       name: 'X-Simulation-Key',
       description:
-        'Clave compartida solo con el equipo P08 (o terceros autorizados) para iniciar/detener la simulación',
+        'Clave compartida solo con el equipo P08 (o terceros autorizados) para simulación automática y escenarios de demostración',
       required: true,
     }),
     ApiUnauthorizedResponse({

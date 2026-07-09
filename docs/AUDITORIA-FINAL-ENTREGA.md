@@ -1,4 +1,4 @@
-# Auditoría pre-entrega — IoT Platform Backend (P08)
+# Auditoría Entrega final — IoT Platform Backend (P08)
 
 **Documento:** Revisión final exhaustiva antes de entrega  
 **Proyecto:** P08 — Plataforma IoT (NestJS)  

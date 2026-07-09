@@ -929,6 +929,7 @@ Si el broker es incorrecto o inalcanzable, la API sigue operativa pero los event
 | Retención lecturas (TTL 7 días) | ✅ `READINGS_TTL_DAYS` |
 | Agregación dispositivos | ✅ `GET /sensors/devices` |
 | Evidencia escala 1.000 sensores | ✅ [`docs/local/INFORME-PRUEBAS-ESCALA-E-INTEGRACIONES.md`](docs/local/INFORME-PRUEBAS-ESCALA-E-INTEGRACIONES.md) |
+| Informe E2E e integración | ✅ [Google Docs](https://docs.google.com/document/d/125Om6CwrevJw2ErB9E7fr61X0lbjzds8-uVapIaU20Q/edit?usp=sharing) |
 | Confirmación formal P01 | ⏳ Pendiente coordinación externa |
 | JWT / auth API | ⏳ Fuera de MVP (deps preparadas) |
 
@@ -938,6 +939,7 @@ Si el broker es incorrecto o inalcanzable, la API sigue operativa pero los event
 |-----------|-----------|
 | **README.md** (este archivo) | Instalación, configuración, endpoints, integraciones, arquitectura |
 | [`docs/local/INFORME-PRUEBAS-ESCALA-E-INTEGRACIONES.md`](docs/local/INFORME-PRUEBAS-ESCALA-E-INTEGRACIONES.md) | Evidencia cuantitativa prueba 1.000 sensores + demo P11/P06 |
+| [Informe E2E e integración (Google Docs)](https://docs.google.com/document/d/125Om6CwrevJw2ErB9E7fr61X0lbjzds8-uVapIaU20Q/edit?usp=sharing) | Casos de prueba manuales: telemetría, health, simulación, P09/P11/P06 |
 | [`docs/AUDITORIA-FINAL-ENTREGA.md`](docs/AUDITORIA-FINAL-ENTREGA.md) | Revisión técnica pre-entrega |
 | [`docs/ESTADO-PROYECTO.md`](docs/ESTADO-PROYECTO.md) | Índice breve (apunta aquí; sin duplicar contenido) |
 

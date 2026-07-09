@@ -2,7 +2,7 @@
 
 **Documento:** Revisión final exhaustiva antes de entrega  
 **Proyecto:** P08 — Plataforma IoT (NestJS)  
-**Fecha de auditoría:** 09/07/2026  
+**Fecha de auditoría:** 09/07/2026 (actualización pruebas E2E: 09/07/2026)  
 **Alcance:** Código en `main`, tests, build, documentación y configuración de despliegue  
 **Metodología:** Revisión como evaluador universitario estricto + ingeniero senior de software
 
@@ -266,30 +266,43 @@ Complejidad innecesaria: mínima. Dependencias JWT/bcrypt instaladas sin uso —
 
 | Métrica | Valor |
 |---------|-------|
-| Test suites | 23 passed |
-| Tests | 67 passed |
+| Test suites (unitarios) | 23 passed |
+| Tests unitarios | 67 passed |
 | Cobertura statements | **57.56 %** |
 | Cobertura branches | **39.32 %** |
-| E2E | Solo `GET /` → `"Hello World!"` |
+| E2E automatizado en repo | `test/app.e2e-spec.ts` — smoke `GET /` |
+| E2E / integración documentados | [Informe E2E (Google Docs)](https://docs.google.com/document/d/125Om6CwrevJw2ErB9E7fr61X0lbjzds8-uVapIaU20Q/edit?usp=sharing) + [`INFORME-PRUEBAS-ESCALA-E-INTEGRACIONES.md`](./local/INFORME-PRUEBAS-ESCALA-E-INTEGRACIONES.md) |
 
-### Bien cubierto
+### Estrategia de pruebas (estado actual)
+
+El proyecto combina **tests automatizados en el repo** con **evidencia E2E e integración documentada** para la entrega:
+
+| Capa | Qué cubre | Dónde |
+|------|-----------|--------|
+| Unitarios | Umbrales, alertas, dedup, Kafka setup, demo scenarios, guards, P06 (mock) | `src/**/*.spec.ts` |
+| E2E automatizado | Arranque de `AppModule` y endpoint raíz | `test/app.e2e-spec.ts` |
+| E2E manual / integración | Telemetría, health, simulación, Simulation Demo, P09/P11/P06 en Render y Docker | [Informe E2E (Google Docs)](https://docs.google.com/document/d/125Om6CwrevJw2ErB9E7fr61X0lbjzds8-uVapIaU20Q/edit?usp=sharing) |
+| Escala | 1.000 sensores, Mongo, Kafka consumer | [`docs/local/INFORME-PRUEBAS-ESCALA-E-INTEGRACIONES.md`](./local/INFORME-PRUEBAS-ESCALA-E-INTEGRACIONES.md) + capturas en `docs/local/img/` |
+
+Los casos E2E de negocio (p. ej. `POST /telemetry` → persistencia + alerta, demo P11/P06) **no están ausentes**: se documentan en el [informe E2E (Google Docs)](https://docs.google.com/document/d/125Om6CwrevJw2ErB9E7fr61X0lbjzds8-uVapIaU20Q/edit?usp=sharing) con pasos reproducibles, capturas y resultados esperados. El repo prioriza unitarios + smoke E2E; ampliar `test/*.e2e-spec.ts` queda como mejora opcional post-entrega.
+
+### Bien cubierto (automatizado)
 
 - `src/sensors/sensors.service.spec.ts` — umbrales, Kafka, paginación, regex
 - `src/alerts/alerts.service.spec.ts` — dedup, resolución, P11
 - `src/notifications/tests/notifications.spec.ts` — reintentos + persistencia de fallos
 - Guards, filtros, demo scenarios, Kafka topic setup
 
-### Sin tests (crítico)
+### Sin tests automatizados (brecha en repo, no en entrega)
 
 - `src/kafka/kafka-producer.service.ts`
 - `src/analytics/analytics-events.service.ts`
 - `src/incidents/incidents-events.service.ts`
-- E2E de `POST /telemetry`, `/health`, `/simulation/demo`
-- Flujo integración HTTP real (mockeado parcialmente)
+- E2E automatizado de `POST /telemetry`, `/health`, `/simulation/demo` (cubierto en [informe E2E Google Docs](https://docs.google.com/document/d/125Om6CwrevJw2ErB9E7fr61X0lbjzds8-uVapIaU20Q/edit?usp=sharing))
 
-### Tests recomendados antes de entregar
+### Mejoras opcionales (post-entrega)
 
-1. E2E: `POST /telemetry` → lectura en Mongo + alerta generada.
+1. Automatizar en `test/*.e2e-spec.ts` los casos ya descritos en el informe Google Docs.
 2. Unit: dedup concurrente (dos `create` paralelos mismo sensor/tipo).
 3. Unit: `sensor_offline` no emite Kafka si alerta deduplicada.
 4. Unit: `assetId` propagado a P06 desde `analyticsContext`.
@@ -304,13 +317,13 @@ Complejidad innecesaria: mínima. Dependencias JWT/bcrypt instaladas sin uso —
 - README extenso: setup Docker, variables, endpoints, integraciones, errores.
 - Swagger operativo en `/docs`.
 - README como documentación principal unificada; `ESTADO-PROYECTO.md` es índice breve.
-- `docs/local/INFORME-PRUEBAS-ESCALA-E-INTEGRACIONES.md` — evidencia cuantitativa.
+- `docs/local/INFORME-PRUEBAS-ESCALA-E-INTEGRACIONES.md` — evidencia cuantitativa de escala e integraciones.
+- [**Informe E2E e integración (Google Docs)**](https://docs.google.com/document/d/125Om6CwrevJw2ErB9E7fr61X0lbjzds8-uVapIaU20Q/edit?usp=sharing) — casos manuales reproducibles (telemetría, health, demo, P09/P11/P06).
 
 ### Brechas
 
 | Brecha | Impacto |
 |--------|---------|
-| `/simulation/demo/*` no en README | Evaluador no encuentra la feature estrella de demo |
 | `JWT_SECRET` en README/render pero no en `.env.example` | Inconsistencia |
 | `SIMULATION_ANOMALY_PROBABILITY` poco documentada en README | — |
 | Sin CI/CD documentado | — |
@@ -333,7 +346,7 @@ Complejidad innecesaria: mínima. Dependencias JWT/bcrypt instaladas sin uso —
 **Por debajo del estándar profesional en:**
 
 - Autenticación
-- Tests E2E
+- Automatización E2E en repo (limitada; evidencia manual en Google Docs)
 - CI/CD
 - Hardening de producción
 - Consumer Kafka funcional
@@ -344,9 +357,9 @@ Complejidad innecesaria: mínima. Dependencias JWT/bcrypt instaladas sin uso —
 
 ## Executive Summary
 
-Proyecto **sólido y entregable** para Ingeniería de Software universitaria. El núcleo funciona, está desplegado, integra con P01/P06/P09/P11, tiene Swagger, pruebas unitarias razonables y evidencia de escala con 1000 sensores.
+Proyecto **sólido y entregable** para Ingeniería de Software universitaria. El núcleo funciona, está desplegado, integra con P01/P06/P09/P11, tiene Swagger, pruebas unitarias razonables, evidencia de escala con 1000 sensores e **informes E2E/integración** (Google Docs + `docs/local/`).
 
-Los problemas más serios son de **seguridad por diseño abierto** (aceptable si se defiende como contrato IoT), **bugs de concurrencia en alertas**, **consumer Kafka incompleto** y **cobertura de tests media**.
+Los problemas más serios son de **seguridad por diseño abierto** (aceptable si se defiende como contrato IoT), **bugs de concurrencia en alertas**, **consumer Kafka incompleto** y **cobertura unitaria media** (E2E de negocio documentado fuera del repo).
 
 No está listo para producción real sin auth, rate limiting y hardening.
 
@@ -359,19 +372,17 @@ Issues que conviene abordar antes de entregar si hay tiempo:
 1. **Documentar explícitamente** por qué `POST /telemetry` es público (contrato P01) o añadir API key de dispositivo.
 2. **Corregir `assetId` en P06** — pasar desde `analyticsContext` o persistir en `Alert`.
 3. **Condicionar emisión Kafka `sensor_offline`** a alerta realmente nueva.
-4. **Subir capturas** al informe en `docs/local/img/`.
-5. **Documentar Simulation Demo** en README con flujo P11/P06 para el profesor.
 ---
 
 ## Important Improvements
 
 1. Índice único parcial en alertas abiertas + operación atómica.
 2. Escalado de severidad en alertas existentes.
-3. E2E mínimo de telemetría + health.
-4. Obligar `CORS_ORIGIN` en producción.
-5. Mantener desactivada `SIMULATION_AUTO_START` en Render (como ya está actualmente) salvo demos.
-6. Implementar lógica real en consumer Kafka o documentar que es solo contador/observabilidad.
-7. Warnings HTTP cuando P09/P11 fallen (opcional pero profesional).
+3. Obligar `CORS_ORIGIN` en producción.
+4. Mantener desactivada `SIMULATION_AUTO_START` en Render (como ya está actualmente) salvo demos.
+5. Implementar lógica real en consumer Kafka o documentar que es solo contador/observabilidad.
+6. Warnings HTTP cuando P09/P11 fallen (opcional pero profesional).
+7. *(Opcional post-entrega)* Automatizar casos del informe E2E en `test/*.e2e-spec.ts`.
 
 ---
 
@@ -400,9 +411,9 @@ Calificaciones de 1 a 10:
 | Seguridad | **5** | Sin auth en endpoints principales; aceptable en contexto académico si se documenta |
 | Mantenibilidad | **7.5** | Buena estructura; README como fuente única |
 | Rendimiento | **7.5** | Escala 1000 probada con aislamiento; integraciones saturan P09 |
-| Testing | **6.5** | 67 tests, 57 % cov; E2E casi inexistente |
-| Documentación | **8.5** | README + Swagger + informes; faltan demo endpoints |
-| **Calidad global** | **7.5** | MVP académico muy completo; no production-grade |
+| Testing | **7.5** | 67 tests unitarios, 57 % cov; E2E/integración documentados (Google Docs + informe escala) |
+| Documentación | **8.5** | README + Swagger + informes locales + informe E2E en Google Docs |
+| **Calidad global** | **7.8** | MVP académico muy completo con evidencia de pruebas documentada |
 
 ---
 
@@ -411,10 +422,8 @@ Calificaciones de 1 a 10:
 Las cinco mejoras que haría primero, en orden de prioridad:
 
 1. **Corregir bug `assetId` → P06** y condicionar Kafka `sensor_offline` (impacto visible en demo).
-2. **Completar informe con capturas** y link GitHub en la entrega.
-3. **Añadir sección README "Simulation Demo"** con pasos exactos para P11/P06 en cátedra.
-4. **E2E de telemetría** (1 test que demuestre persistencia + alerta).
-5. **Documentar decisiones de seguridad** (telemetry abierta por P01, integraciones protegidas por API key).
+2. **Documentar decisiones de seguridad** (telemetry abierta por P01, integraciones protegidas por API key).
+3. Automatizar en CI los casos críticos del [informe E2E](https://docs.google.com/document/d/125Om6CwrevJw2ErB9E7fr61X0lbjzds8-uVapIaU20Q/edit?usp=sharing) (opcional).
 
 ---
 
@@ -440,14 +449,15 @@ Las cinco mejoras que haría primero, en orden de prioridad:
 
 **B+ / A-** (aprox. **87–90 %**)
 
-- **A** si la defensa muestra documentación con capturas, y se explican conscientemente las decisiones de seguridad.
-- **B+** si el profesor penaliza fuerte consumer Kafka stub, tests E2E mínimos, o bugs de dedup sin mencionar.
+- **A** si la defensa muestra informes (escala + E2E Google Docs) con capturas y se explican las decisiones de seguridad.
+- **B+** si el profesor penaliza fuerte consumer Kafka stub o bugs de dedup sin mencionar.
 - **No bajaría a B** salvo que falte evidencia de escala o integraciones rotas en demo.
 
 ## Documentos relacionados
 
 | Documento | Descripción |
 |-----------|-------------|
-| [`INFORME-PRUEBAS-ESCALA-E-INTEGRACIONES.md`](./local/INFORME-PRUEBAS-ESCALA-E-INTEGRACIONES.md) | Evidencia cuantitativa de prueba con 1000 sensores |
+| [`INFORME-PRUEBAS-ESCALA-E-INTEGRACIONES.md`](./local/INFORME-PRUEBAS-ESCALA-E-INTEGRACIONES.md) | Evidencia cuantitativa de prueba con 1000 sensores + demo P11/P06 |
+| [Informe E2E e integración (Google Docs)](https://docs.google.com/document/d/125Om6CwrevJw2ErB9E7fr61X0lbjzds8-uVapIaU20Q/edit?usp=sharing) | Casos manuales reproducibles (telemetría, health, demo, integraciones) |
 | [`ESTADO-PROYECTO.md`](./ESTADO-PROYECTO.md) | Índice breve → apunta al README |
 | [`README.md`](../README.md) | Documentación principal del proyecto |

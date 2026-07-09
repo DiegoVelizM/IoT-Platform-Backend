@@ -205,13 +205,12 @@ Subir las imágenes en [`docs/local/img/`](./img/) (crear la carpeta desde GitHu
 
 | # | Descripción | Archivo sugerido |
 |---|-------------|------------------|
-| 1 | Health inicial (`messagesConsumed: 0`) | `img/health-inicial.png` |
-| 2 | Health final (`messagesConsumed: 1526`) | `img/health-final.png` |
-| 3 | Total lecturas Mongo (`total: 1023`) | `img/sensors-total.png` |
-| 4 | Panel P11 — alerta creada | `img/p11-alerta.png` |
-| 5 | Panel P11 — alerta resuelta | `img/p11-resuelta.png` |
-| 6 | Email P06 recibido | `img/p06-email.png` |
-| 7 | Swagger Simulation Demo — respuesta | `img/swagger-demo.png` |
+| 1 | Health tras ejecución 1000 sensores (`messagesConsumed: 1526`) | `img/health-final.png` |
+| 2 | Total lecturas Mongo (`total: 1023`) | `img/sensors-total.png` |
+| 3 | Panel P11 — alerta creada | `img/p11-alerta.png` |
+| 4 | Panel P11 — alerta resuelta | `img/p11-resuelta.png` |
+| 5 | Email P06 recibido | `img/p06-email.png` |
+| 6 | Swagger Simulation Demo — respuesta | `img/swagger-demo.png` |
 
 <!-- Ejemplo tras subir imágenes:
 ![Health check inicial](./img/health-inicial.png)

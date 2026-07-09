@@ -6,15 +6,34 @@ Backend de plataforma IoT desarrollado con NestJS, MongoDB, Kafka y Docker. Orie
 
 Este proyecto corresponde al backend de una plataforma IoT para monitoreo de insumos médicos (cadena de frío) y signos vitales de pacientes. El sistema recibe lecturas de sensores simulados o reales, las persiste en MongoDB, evalúa umbrales para generar alertas automáticamente y publica eventos hacia Kafka para integración con sistemas externos.
 
----
+**Proyecto 08 — Plataforma IoT (NestJS).** Somos **backend sin frontend**: dashboards, tendencias y visualización las cubre **P09** consumiendo nuestros eventos HTTP. Dominio activo: sensores médicos domiciliarios alineados con **P01 — Salud**. Logística (P02) queda fuera de alcance (sin equipo contraparte).
 
+### Integraciones
+
+| Proyecto | Dirección | Estado | Contrato |
+|----------|-----------|--------|----------|
+| **P01 — Salud** | P01 → P08 | ✅ Listo | `GET /sensors/*`, `POST /telemetry` |
+| **P09 — Analítica** | P08 → P09 | ✅ Implementado | `POST /v1/events` (envelope snake_case) |
+| **P11 — Incidentes** | P08 → P11 | ✅ Implementado | `POST /api/v1/alertas` + `alert_resolved` |
+| **P06 — Notificaciones** | P08 → P06 | ✅ Implementado | HTTP con reintentos; alertas `warning`/`critical` |
+| **P02 — Logística** | — | ❌ Fuera de alcance | Sin contraparte en el curso |
+
+### URLs de producción
+
+| Recurso | URL |
+|---------|-----|
+| API + Swagger P08 | https://iot-platform-backend-bm5b.onrender.com/docs |
+| Health | https://iot-platform-backend-bm5b.onrender.com/health |
+| Ingesta P09 | https://analisis-proyecto-ti.onrender.com/v1/events |
+
+---
 ## Características
 
 - API REST con NestJS
 - Documentación con Swagger/OpenAPI
 - Persistencia de telemetría con MongoDB y Mongoose
 - Validaciones mediante DTOs (`class-validator`)
-- Simulación automática de sensores médicos
+- Simulación automática de sensores médicos (hasta 1.000) y **Simulation Demo** para cátedra
 - Generación automática de alertas según umbrales configurables
 - Publicación de eventos con Kafka (productor)
 - Consumo de eventos Kafka internos (consumidor en el mismo proceso)
@@ -235,6 +254,10 @@ Payload enviado a P11 (formato camelCase plano dentro del envelope de P11):
 
 **Cierre de incidentes (recuperación):** cuando la telemetría vuelve a la normalidad, P08 marca la alerta como `resolved: true` en MongoDB y envía el mismo `POST` con `eventType: "alert_resolved"` y solo `sensorId` + `alertType`. P11 correlaciona con el incidente activo del sensor y lo pasa a CERRADO.
 
+**Regla de evaluación por campo:** cada métrica se evalúa de forma independiente en cada lectura. Si el valor enviado está **dentro del rango**, se resuelve la alerta de ese tipo; si está **fuera de rango**, se crea o mantiene la alerta. La simulación y el escenario demo `recovery-normal-reading` envían lecturas **completas** (batería, conexión y métricas clínicas), por lo que en la práctica se resuelven todas las alertas abiertas del sensor al recuperarse.
+
+> **Lecturas parciales:** si un campo no viene en el JSON (p. ej. solo `glucoseLevel` sin `batteryLevel`), solo se evalúan los campos presentes. Una glucosa normal resuelve `glucose_out_of_range`, pero no cierra `low_battery` si esa alerta estaba abierta y no se envió batería. Para integradores (P01): conviene incluir `batteryLevel` y `connectionStatus` en cada POST.
+
 ```json
 {
   "sistema_id": "P08",
@@ -360,13 +383,13 @@ Los campos `createdAt` y `updatedAt` se generan automáticamente en el backend.
 ```http
 GET /sensors
 GET /sensors/latest
+GET /sensors/devices
 GET /sensors/sensor/:sensorId
 ```
 
-Permiten consultar lecturas almacenadas en MongoDB.
+Permiten consultar lecturas almacenadas en MongoDB. `GET /sensors/devices` devuelve un catálogo paginado de sensores distintos (última lectura, `sensorType`, filtros `search` y `sensorType`) — pensado para que P01 vincule dispositivos.
 
 ---
-
 ### Simulación
 
 ```http
@@ -393,9 +416,16 @@ La batería simulada es aleatoria entre **5 % y 100 %** por lectura (`getRandomB
 
 ```env
 SIMULATION_OFFLINE_PROBABILITY=0.02
+# Probabilidad de lectura anómala forzada (0–1). Default 0. Ej: 0.05 = 5%
+# SIMULATION_ANOMALY_PROBABILITY=0
 ```
 
-Usar `0` si se desea desactivar eventos offline en una demo específica. El valor máximo efectivo es `0.25`.
+| Variable | Efecto |
+|----------|--------|
+| `SIMULATION_OFFLINE_PROBABILITY` | Probabilidad de `connectionStatus: offline` por lectura (default `0.02`, máx `0.25`) |
+| `SIMULATION_ANOMALY_PROBABILITY` | Fuerza valores fuera de umbral con la probabilidad indicada (default `0` = desactivado) |
+
+Usar `0` en offline si se desea desactivar eventos offline en una demo específica.
 
 **Auto-start al arrancar** (sin llamar manualmente a `/simulation/start`):
 
@@ -477,8 +507,28 @@ Ejemplo — demo integrada con P09:
 
 > **P02 (logística):** sin equipo contraparte; el dominio activo es salud/P01. No hay requisito de GPS en la rúbrica.
 
----
+### Simulation Demo (cátedra)
 
+Endpoints para demostrar alertas e integraciones sin depender del auto-start ni de valores aleatorios:
+
+```http
+GET  /simulation/demo/scenarios
+POST /simulation/demo/scenarios/:scenarioId/run   # requiere X-Simulation-Key
+POST /simulation/demo/telemetry                   # requiere X-Simulation-Key
+```
+
+1. Listar escenarios (`low-battery-warning`, `glucose-critical`, `recovery-normal-reading`, etc.).
+2. Ejecutar uno con `X-Simulation-Key` → flujo completo: MongoDB, Kafka, P11, P06 (y P09 si está activo).
+3. Verificar en panel P11 y correo P06; para recuperación usar `recovery-normal-reading`.
+
+Ejemplo:
+
+```http
+POST /simulation/demo/scenarios/low-battery-warning/run
+X-Simulation-Key: <SIMULATION_API_KEY>
+```
+
+---
 ### Alertas
 
 ```http
@@ -488,6 +538,8 @@ GET  /alerts/sensor/:sensorId
 ```
 
 Permiten crear y consultar alertas asociadas a sensores. Al crear una alerta manualmente, se publica el evento `alert_generated` en Kafka.
+
+**Resolución automática:** al recibir telemetría con valores **dentro de rango**, se cierran las alertas abiertas del mismo tipo para ese sensor (y se notifica `alert_resolved` a P11). Requiere que el campo correspondiente venga en la lectura; ver sección *Cierre de incidentes* más arriba.
 
 Tipos de alerta generados automáticamente:
 
@@ -610,8 +662,25 @@ Sensores simulados / POST /telemetry
 
 P08 expone datos vía API (`GET /sensors/*`) para **P01** y eventos HTTP para **P09** (visualización) y **P11** (incidentes críticos). No implementamos paneles propios.
 
-Topics Kafka publicados y consumidos internamente:
+**Dos formatos de evento (no mezclar):**
 
+| Canal | Formato | Ejemplo |
+|-------|---------|---------|
+| Kafka interno (P08) | JSON plano camelCase | `eventType`, `sensorId`, `alertType` |
+| HTTP hacia P09 | Envelope snake_case | `event_type`, `payload` anidado |
+
+Mapper P09: `src/analytics/analytics-event.mapper.ts`.
+
+**Kafka local vs nube** (`src/kafka/kafka.config.ts`):
+
+| Entorno | Credenciales Kafka | Modo | Conexión |
+|---------|-------------------|------|----------|
+| Docker local | sin `KAFKA_USERNAME`/`PASSWORD` | `local` | `kafka:9092` PLAINTEXT |
+| Render + Confluent | con credenciales | `cloud` | SSL + SASL |
+
+**Prueba de escala 1.000 sensores:** ejecutar solo en **Docker local** (`ANALYTICS_EVENTS_ENABLED=false`). No usar Render free ni Confluent trial para carga masiva — límites de RAM, cold starts y cuotas. La demo end-to-end en producción usa volumen bajo (auto-start 4 sensores / 10 s). Evidencia documentada: [`docs/local/INFORME-PRUEBAS-ESCALA-E-INTEGRACIONES.md`](docs/local/INFORME-PRUEBAS-ESCALA-E-INTEGRACIONES.md).
+
+Topics Kafka publicados y consumidos internamente:
 | Topic | Descripción |
 |-------|-------------|
 | `telemetry_received` | Nueva lectura procesada |
@@ -849,36 +918,36 @@ Si el broker es incorrecto o inalcanzable, la API sigue operativa pero los event
 
 ## Estado del proyecto
 
-Proyecto académico en desarrollo activo. Documentación detallada del equipo: [`docs/ESTADO-PROYECTO.md`](docs/ESTADO-PROYECTO.md).
+**Última actualización:** 09/07/2026 · Entrega académica P08.
 
-**Implementado:**
+| Área | Estado |
+|------|--------|
+| MVP (API, Mongo, alertas, Swagger, deploy) | ✅ Completo |
+| Integraciones P09, P11, P06 | ✅ Verificadas en demo |
+| Kafka productor + consumidor interno | ✅ Publica y consume (log/contador) |
+| Simulación + Simulation Demo | ✅ Hasta 1.000 sensores; escenarios cátedra |
+| Retención lecturas (TTL 7 días) | ✅ `READINGS_TTL_DAYS` |
+| Agregación dispositivos | ✅ `GET /sensors/devices` |
+| Evidencia escala 1.000 sensores | ✅ [`docs/local/INFORME-PRUEBAS-ESCALA-E-INTEGRACIONES.md`](docs/local/INFORME-PRUEBAS-ESCALA-E-INTEGRACIONES.md) |
+| Confirmación formal P01 | ⏳ Pendiente coordinación externa |
+| JWT / auth API | ⏳ Fuera de MVP (deps preparadas) |
 
-- Ingestión de telemetría médica (`POST /telemetry`)
-- Simulación automática de sensores (`/simulation/*`)
-- Persistencia en MongoDB
-- Generación automática de alertas por umbrales
-- Productor Kafka con publicación de eventos
-- Consumidor Kafka interno (`KafkaConsumerService`) con logs y contador
-- Integración HTTP con P09 (analítica / dashboards)
-- Integración HTTP con P11 (incidentes con umbral configurable `warning`/`critical`)
-- Estandarización de errores HTTP 400/404/500 con `HttpExceptionFilter`
-- Manejo estructurado de errores Kafka con `warnings` en respuestas y estado en `/health`
-- Documentación Swagger con respuestas de error por endpoint
-- Auto-start con `SIMULATION_AUTO_START=true` (PR #19)
-- Generación de hasta 1.000 `sensorId` distintos
-- Throttling básico con arranque escalonado (`SIMULATION_STAGGER_MS`)
-- Contenerización con Docker Compose
+### Documentación del repositorio
 
-**Pendiente / en progreso:**
+| Documento | Contenido |
+|-----------|-----------|
+| **README.md** (este archivo) | Instalación, configuración, endpoints, integraciones, arquitectura |
+| [`docs/local/INFORME-PRUEBAS-ESCALA-E-INTEGRACIONES.md`](docs/local/INFORME-PRUEBAS-ESCALA-E-INTEGRACIONES.md) | Evidencia cuantitativa prueba 1.000 sensores + demo P11/P06 |
+| [`docs/AUDITORIA-FINAL-ENTREGA.md`](docs/AUDITORIA-FINAL-ENTREGA.md) | Revisión técnica pre-entrega |
+| [`docs/ESTADO-PROYECTO.md`](docs/ESTADO-PROYECTO.md) | Índice breve (apunta aquí; sin duplicar contenido) |
 
-- Evidencia documentada de prueba 1.000 sensores (Mongo + consumer)
-- Retención y agregación de datos (requisito del enunciado) — **TTL lecturas 7 días** implementado; agregación mínima pendiente
-- Confirmación de P01 sobre contrato de telemetría
-- Integración del endpoint `/events/test` con Kafka
+### Decisiones de arquitectura
 
-**Fuera de alcance:**
-
-- P02 logística (sin equipo contraparte)
-- Frontend propio (visualización = P09)
+1. Dominio médico (P01), no logística (P02).
+2. MongoDB = fuente de verdad para `GET /sensors/*`.
+3. Kafka interno camelCase; P09 HTTP snake_case; P11 envelope con `sistema_id`.
+4. Kafka prod = Confluent Cloud; escala masiva = Docker local.
+5. Visualización = P09; P08 no tiene frontend.
+6. `POST /telemetry` público por contrato P01; simulación y alertas manuales con API keys.
 
 ---

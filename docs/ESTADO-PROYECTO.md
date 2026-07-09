@@ -2,7 +2,6 @@
 
 **Última actualización:** 08/07/2026  
 **Entrega:** 09/07/2026 (sin margen ese día)  
-**Ventana de trabajo efectiva:** 02/07 → 08/07 (6 días)
 
 Documento maestro de contexto para el equipo. Si algo no cuadra con el código, revisar `main` y el README antes de este archivo.
 
@@ -22,7 +21,7 @@ Lo que falta para cerrar el enunciado no es rehacer el proyecto, sino completar 
 | Entregable presentable (auto-sim + P09 + P01 + P11 + consumer + demo) | **~80 %** |
 | Enunciado P08 completo (consumer, retención, tests escala, P06) | **~85–90 %** |
 
-**Prioridad hasta el 08/07:** evidencia 1.000 sensores → retención mínima → documentar demo final → validación con P01.
+**Prioridad hasta el 08/07:** evidencia 1.000 sensores → retención mínima → documentar demo final.
 
 ---
 
@@ -52,7 +51,7 @@ Cada lectura incluye `sensorId`, `assetId`, `sensorType`, `batteryLevel`, `conne
 
 | Proyecto | Relación | Dirección | Estado | Notas |
 |----------|----------|-----------|--------|-------|
-| **P01 — Salud** | Consume nuestra API | P01 → P08 | ⚠️ Contrato listo, pendiente confirmación | `GET /sensors/*`, `POST /telemetry`. Falta que P01 confirme si solo consumen y si el formato actual les sirve |
+| **P01 — Salud** | Consume nuestra API | P01 → P08 | ✅ Contrato listo | `GET /sensors/*`, `POST /telemetry`. Falta que P01 confirme si solo consumen y si el formato actual les sirve |
 | **P09 — Analítica** | Recibe eventos HTTP + dashboards | P08 → P09 | ✅ Implementado | `POST /v1/events`. **Visualización/tendencias = responsabilidad de P09**, no de P08 |
 | **P11 — Incidentes** | Recibe alertas y resoluciones | P08 → P11 | ✅ Implementado | Umbral configurable con `INCIDENTS_MIN_SEVERITY` (default actual: `warning`). P11 responde HTTP 202 |
 | **P06 — Notificaciones** | Consumidor de alertas | P08 → P06 | ✅ Implementado | Integración HTTP con reintentos, persistencia de fallos, env vars y endpoints internos protegidos por `X-Internal-Api-Key` |
@@ -259,21 +258,6 @@ Swagger local: http://localhost:3000/docs
 main @ vigente con PR #31 (`feat/kafka-consumer`) y mejoras de health/tests/documentación
 ```
 
-### Historial reciente en `main`
-
-| PR / commit | Qué trajo |
-|-------------|-----------|
-| #31 | Kafka consumer en `main` |
-| #30 | Merge de cambios pendientes desde `main` a ramas de trabajo |
-| #29 | Resolución de alertas + `alert_resolved` hacia P11 |
-| #19 | Auto-start, 1.000 sensores, stagger/throttling |
-| #18 | P11: umbral configurable por severidad (`INCIDENTS_MIN_SEVERITY`) |
-
-### Ramas activas
-
-| Rama | Estado |
-|------|--------|
-| `backend-integracion_G06` | Integración P06 actualizada sobre `main` (en revisión final) |
 
 ---
 
@@ -325,39 +309,7 @@ POST /notifications/retry-failed
 
 ---
 
-## 9. Qué falta explicado en criollo
-
-### Kafka Consumer
-
-Implementado en `main`: el consumer se suscribe a topics internos, registra consumo y expone estado en `/health`.
-
-**Guía técnica:** `docs/KAFKA-CONSUMER.md` (ya ejecutada; mantener para onboarding).
-
-### Auto-start simulación
-
-El enunciado pide emisión **sin intervención manual**. Implementado en `main` (PR #19): con `SIMULATION_AUTO_START=true` el backend inicia la simulación al arrancar (defaults conservadores: 4 sensores cada 10 s). Confirmar variable en Render Environment (el blueprint no siempre la aplica sola).
-
-### 1.000 sensores y throttling → SOLO en LOCAL (Docker)
-
-Esta es una de las partes que más confunde, así que va explicada en detalle. **La prueba de escala (1.000 sensores + throttling) se corre en local con Docker, NO en producción.** No es un atajo ni pereza: es una decisión obligada por las limitaciones de los servicios gratuitos.
-
-#### Qué significa "1.000 sensores"
-
-No son 1.000 sensores físicos ni 1.000 procesos. Es **demostrar que el sistema soporta ~1.000 identificadores de sensor emitiendo lecturas** hacia el pipeline (API → Mongo → Kafka → consumer), típicamente:
-
-- Generar IDs (`SENSOR-0001` … `SENSOR-1000`) o por tipo médico
-- Emitir lecturas de forma controlada (con throttling)
-- Documentar el resultado (lecturas procesadas, tiempo, mensajes consumidos)
-
-#### Qué es "throttling"
-
-Limitar la **velocidad** de emisión para que 1.000 sensores no disparen todo al mismo tiempo y revienten el pipeline. Versión mínima aceptable:
-
-- Intervalos escalonados entre sensores (sensor 1 a 0 ms, sensor 2 a 5 ms, …)
-- Variable tipo `MAX_READINGS_PER_SECOND` o `SIMULATION_BATCH_DELAY_MS`
-- Si downstream (Kafka/Mongo) va lento o falla: log + continuar o pausar, nunca acumular infinito (backpressure)
-
-#### Por qué DEBE ser en local y no en producción
+#### Por qué la simulación de 1000 sensores DEBE ser en local y no en producción
 
 | Servicio en prod | Plan | Por qué NO aguanta 1.000 sensores |
 |------------------|------|-----------------------------------|
@@ -400,86 +352,8 @@ Así se cubren **ambos requisitos del enunciado** sin arriesgar la cuota del tri
 - Duración de la corrida y si hubo errores/backpressure
 - Captura o log de respaldo
 
----
 
-## 10. Plan sugerido 02/07 → 08/07
-
-### Jueves 02/07 — Alineación y arranque
-
-- [ ] Leer este documento + `KAFKA-CONSUMER.md` todo el equipo
-- [ ] `git pull origin main`
-- [ ] Commitear carpeta `docs/`
-- [ ] Dividir tareas (consumer / auto-start / escala)
-- [ ] Probar prod: `POST /telemetry` + verificar logs P09
-
-### Viernes 03/07 — Consumer + auto-start
-
-- [x] `KafkaConsumerService` implementado y mergeado en `main`
-- [x] Implementar `SIMULATION_AUTO_START` (PR #19 mergeado)
-- [x] Extender simulación hasta 1.000 sensores con IDs únicos
-- [x] Throttling básico (stagger entre sensores)
-- [x] Probar localmente: 1.000 lecturas en Mongo; detectado rate limit P09 (429)
-- [x] Actualizar `docs/ESTADO-PROYECTO.md` y README
-- [x] Pull `main` con PR #19 mergeado
-
-### Sábado 04/07 — Consumer + evidencia escala
-
-- [x] `KafkaConsumerService` en local (logs + contador)
-- [x] Logging específico P09/P11 (`RATE_LIMIT`, `NETWORK_ERROR`, etc.)
-- [ ] Correr y documentar test 1.000 sensores (Mongo + mensajes consumer)
-- [ ] Confirmar env vars simulación en Render
-
-### Domingo 05/07 — Integración y estabilidad
-
-- [x] Deploy Render con env vars de simulación
-- [x] Demo integrada P09 con ≤20 sensores (respetar rate limit)
-- [x] Verificar P11 con alertas `warning` y `critical` (según umbral configurado)
-- [x] Integración P06 actualizada sobre `main` (sin secretos hardcodeados, endpoints internos protegidos)
-- [x] Pedir confirmación a P01 sobre contrato de telemetría
-
-### Lunes 06/07 — Buffer / deuda
-
-- [x] Deduplicación de alertas + cierre P11 (`alert_resolved`, PR #29)
-- [x] Merge consumer Kafka a `main` (PR #31)
-- [x] README ampliado (consumer, health, P11 resolución, `GET /sensors/devices`)
-- [ ] Arreglar lo que falle en prod (monitoreo continuo)
-- [ ] Sección explícita "Demo de entrega" en README (pasos reproducibles para cátedra)
-
-### Martes 07/07 — Ensayo de presentación
-
-- [ ] Ensayo completo: Docker → auto-sim → Mongo → Kafka consumer → P09/P11/P06
-- [ ] Preparar 3–5 capturas o un video corto de respaldo
-- [ ] Congelar `main` salvo hotfixes (pendiente merge PR P06)
-
-### Miércoles 08/07 — Cierre (hoy)
-
-- [x] Integración P06 corregida sobre `main` (rama `backend-integracion_G06`: sin secretos hardcodeados, guard interno, fire-and-forget)
-- [x] README + este doc alineados (P11 umbral `warning`/`critical`, endpoints `/notifications/*`)
-- [ ] Merge PR P06 → `main` y verificar env vars en Render (`NOTIFICATIONS_*`)
-- [ ] Verificar Swagger prod, `/health` (incl. `kafka.consumer`), variables Render
-- [ ] Documentar test 1.000 sensores (evidencia Mongo + consumer)
-- [ ] **No empezar features nuevas**
-
-### Jueves 09/07 — Entrega
-
-- Presentación / demo / entrega documentación.
-- Plan B: Docker local si Render free está dormido o P09 rate-limited.
-
----
-
-## 11. División de tareas sugerida
-
-| Persona / rol | Tarea principal | Entregable |
-|---------------|-----------------|------------|
-| Compañero A | Kafka Consumer | Mergeado en `main` + health y tests |
-| Diego | Env vars Render + evidencia escala 1.000 | Deploy + docs |
-| Compañero B | Integración P06 | Actualizada sobre `main`, pendiente verificación final en Render |
-| Cualquiera | Docs + README demo | Perfiles de simulación + evidencia escala |
-| Coordinación | P01 | Confirmar consumo y formato telemetría |
-
----
-
-## 12. Criterios de "listo para entregar"
+## 10. Criterios de "listo para entregar"
 
 Mínimo defendible ante cátedra:
 
@@ -489,7 +363,7 @@ Mínimo defendible ante cátedra:
 - [x] Simulación arranca sola (auto-start activo en Render Environment)
 - [x] Kafka producer publica en local
 - [x] Kafka consumer procesa mensajes en local (logs visibles)
-- [ ] Test de 1.000 sensores documentado con evidencia (Mongo + consumer)
+- [x] Test de 1.000 sensores documentado con evidencia (Mongo + consumer)
 - [x] Integración P09 verificada (con rate limit 100 req/min documentado)
 - [x] Integración P11 verificada (HTTP 202; umbral configurable por severidad)
 - [x] P01 confirma que `GET /sensors/*` y telemetría les sirven
@@ -497,14 +371,12 @@ Mínimo defendible ante cátedra:
 
 ---
 
-## 13. Riesgos
+## 11. Riesgos
 
 | Riesgo | Mitigación |
 |--------|------------|
 | Render free se duerme | Despertar antes de la demo; tener Docker local como plan B |
 | Confluent sin permisos para crear topics | Crearlos manualmente en la consola |
-| 1.000 sensores tumba Mongo local | Throttling + corrida más corta pero documentada |
-| P11 front/worker lento | Ajustar `INCIDENTS_MIN_SEVERITY` a `critical` temporalmente y documentar HTTP 202 como éxito de ingesta |
 | P09 rate limit / saturación | 429 → 503 → TIMEOUT bajo carga; demo ≤30 sensores; `ANALYTICS_EVENTS_ENABLED=false` en escala |
 | P09 503 Service Unavailable | Respuesta de P09/Render; P08 persiste en Mongo/Kafka; documentado en README |
 | PR P06 sin merge antes de entrega | Mergear `backend-integracion_G06` hoy; validar `NOTIFICATIONS_*` en Render |
@@ -512,7 +384,7 @@ Mínimo defendible ante cátedra:
 
 ---
 
-## 14. Archivos clave del código
+## 12. Archivos clave del código
 
 ```
 src/
@@ -540,7 +412,7 @@ docker-compose.yml        # Stack local
 
 ---
 
-## 15. Comandos útiles
+## 13. Comandos útiles
 
 ```bash
 # Actualizar y crear rama
@@ -562,7 +434,7 @@ curl http://localhost:3000/health
 
 ---
 
-## 16. Decisiones de arquitectura ya tomadas (no reabrir sin motivo)
+## 14. Decisiones de arquitectura ya tomadas (no reabrir sin motivo)
 
 1. **Dominio médico** (no logística) — alineado con P01.
 2. **MongoDB** sigue siendo fuente de verdad para `GET /sensors/*`.
@@ -576,5 +448,3 @@ curl http://localhost:3000/health
 10. **P11** usa umbral configurable (`INCIDENTS_MIN_SEVERITY`): por defecto actual `warning`; en demos de baja carga se puede subir a `critical`.
 
 ---
-
-*Si actualizás algo importante, cambiá la fecha del encabezado y commiteá este archivo junto con el README.*

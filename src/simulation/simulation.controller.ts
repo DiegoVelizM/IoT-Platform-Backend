@@ -36,7 +36,8 @@ export class SimulationController {
   @ApiOperation({
     summary: 'Iniciar simulación automática',
     description:
-      'Emite lecturas periódicas hacia el flujo de telemetría. Requiere header X-Simulation-Key (solo equipo P08 o terceros autorizados). Si ya hay una simulación activa, responde 200 con mensaje informativo.',
+      'Emite lecturas periódicas hacia el flujo de telemetría. Requiere header X-Simulation-Key (solo equipo P08 o terceros autorizados). ' +
+      'Body opcional: `quantity` (1–1000), `frequencyMs` (1000–120000) o lista `sensors` con frecuencia individual. Si ya hay una simulación activa, responde 200 con mensaje informativo.',
   })
   @ApiOkResponse({ description: 'Simulación iniciada o mensaje si ya estaba en ejecución' })
   @ApiWriteErrors()
@@ -44,8 +45,23 @@ export class SimulationController {
     required: false,
     type: StartSimulationDto,
     examples: {
+      quantityAndFrequency: {
+        summary: 'Cantidad y frecuencia (recomendado)',
+        description: 'Inicia N sensores con el mismo intervalo entre lecturas.',
+        value: {
+          quantity: 4,
+          frequencyMs: 10000,
+        },
+      },
+      scaleLocal: {
+        summary: 'Escala local (hasta 1000 sensores)',
+        value: {
+          quantity: 1000,
+          frequencyMs: 120000,
+        },
+      },
       globalFrequency: {
-        summary: 'Frecuencia global',
+        summary: 'Solo frecuencia (default 4 sensores)',
         value: {
           frequencyMs: 5000,
         },
@@ -56,7 +72,7 @@ export class SimulationController {
           sensors: [
             { sensorId: 'OXI-001', frequencyMs: 1000 },
             { sensorId: 'GLUCO-001', frequencyMs: 3000 },
-            {sensorId: 'THERMO-001', frequencyMs: 5000 },
+            { sensorId: 'THERMO-001', frequencyMs: 5000 },
             { sensorId: 'BP-001', frequencyMs: 10000 },
           ],
         },

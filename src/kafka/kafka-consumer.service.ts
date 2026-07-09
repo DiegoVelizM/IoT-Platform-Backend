@@ -21,6 +21,7 @@ export class KafkaConsumerService implements OnModuleInit, OnModuleDestroy {
 
   private kafka: Kafka;
   private consumer: Consumer;
+  private consumerRunning = false;
   private isConnected = false;
   private messagesConsumed = 0;
   private lastError?: string;
@@ -72,6 +73,8 @@ export class KafkaConsumerService implements OnModuleInit, OnModuleDestroy {
         },
       });
 
+      this.consumerRunning = true;
+
       this.logger.log('Kafka consumer is running.');
     } catch {
       this.isConnected = false;
@@ -83,6 +86,12 @@ export class KafkaConsumerService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleDestroy() {
     try {
+      if (this.consumerRunning) {
+        await this.consumer.stop();
+        this.consumerRunning = false;
+        this.logger.log('Kafka consumer stopped.');
+      }
+
       await this.consumer.disconnect();
       this.isConnected = false;
       this.logger.log('Kafka consumer disconnected.');

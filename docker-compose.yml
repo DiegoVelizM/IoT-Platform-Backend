@@ -4,13 +4,16 @@ services:
     container_name: iot_backend
     ports:
       - "3000:3000"
+    env_file:
+      - .env
     environment:
+      # Overrides locales: el .env puede traer Atlas/Confluent de Render.
       PORT: 3000
       MONGODB_URI: mongodb://mongo:27017/sensores_db
       KAFKA_BROKER: kafka:9092
-      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-local-internal-api-key}
-      SIMULATION_API_KEY: ${SIMULATION_API_KEY:-local-simulation-api-key}
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      KAFKA_USERNAME: ""
+      KAFKA_PASSWORD: ""
+      KAFKA_SASL_MECHANISM: ""
     depends_on:
       mongo:
         condition: service_healthy

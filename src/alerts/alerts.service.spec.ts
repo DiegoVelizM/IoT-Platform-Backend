@@ -28,9 +28,12 @@ describe('AlertsService', () => {
     alertModel = Object.assign(jest.fn().mockImplementation((dto) => {
       const saved = {
         ...dto,
-        save: jest.fn().mockResolvedValue(undefined),
-        toObject: () => ({ ...dto }),
+        _id: 'alert-id',
+        toObject: () => ({ ...dto, _id: 'alert-id' }),
       };
+
+      saved.save = jest.fn().mockResolvedValue(saved);
+
       return saved;
     }), {
       find: findMock,
@@ -61,7 +64,10 @@ describe('AlertsService', () => {
         },
         {
           provide: NotificationsService,
-          useValue: { sendNotification: jest.fn().mockResolvedValue({ success: true }) },
+          useValue: {
+            sendNotification: jest.fn().mockResolvedValue({ success: true }),
+            isIntegrationEnabled: jest.fn().mockReturnValue(true),
+          },
         },
       ],
     }).compile();
@@ -97,6 +103,49 @@ describe('AlertsService', () => {
       expect(result).toEqual(existing.toObject());
       expect(alertModel).not.toHaveBeenCalled();
       expect(incidentsEventsService.publishAlert).not.toHaveBeenCalled();
+    });
+
+    it('does not call notifications when integration is disabled', async () => {
+      const notificationsService = {
+        sendNotification: jest.fn().mockResolvedValue({ success: true }),
+        isIntegrationEnabled: jest.fn().mockReturnValue(false),
+      };
+
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          AlertsService,
+          { provide: getModelToken(Alert.name), useValue: alertModel },
+          {
+            provide: KafkaProducerService,
+            useValue: { emit: jest.fn().mockResolvedValue({ success: true }) },
+          },
+          {
+            provide: AnalyticsEventsService,
+            useValue: { publishAlert: jest.fn() },
+          },
+          {
+            provide: IncidentsEventsService,
+            useValue: incidentsEventsService,
+          },
+          { provide: NotificationsService, useValue: notificationsService },
+        ],
+      }).compile();
+
+      const alertsService = module.get<AlertsService>(AlertsService);
+
+      findOneMock.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(null),
+      });
+
+      await alertsService.create({
+        sensorId: 'OXI-001',
+        type: 'low_battery',
+        severity: 'warning',
+        message: 'Battery low',
+        resolved: false,
+      });
+
+      expect(notificationsService.sendNotification).not.toHaveBeenCalled();
     });
   });
 

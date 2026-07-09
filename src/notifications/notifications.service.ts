@@ -45,6 +45,10 @@ export class NotificationsService implements OnModuleInit {
     return !this.explicitlyDisabled && Boolean(this.getApiUrl() && this.getApiKey());
   }
 
+  isIntegrationEnabled(): boolean {
+    return this.enabled;
+  }
+
   onModuleInit(): void {
     if (this.explicitlyDisabled) {
       this.logger.log('Notifications integration disabled via NOTIFICATIONS_ENABLED=false');

@@ -78,8 +78,9 @@ export class AlertsService {
       this.incidentsEventsService.publishAlert(savedAlert, analyticsContext);
 
       if (
-        savedAlert.severity === 'warning' ||
-        savedAlert.severity === 'critical'
+        (savedAlert.severity === 'warning' ||
+          savedAlert.severity === 'critical') &&
+        this.notificationsService.isIntegrationEnabled()
       ) {
         const assetId = (savedAlert as unknown as { assetId?: string }).assetId;
 
